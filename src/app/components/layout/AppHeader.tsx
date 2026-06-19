@@ -1,0 +1,160 @@
+import React, { useState } from 'react';
+import { Search, Bell, Sun, Moon, ChevronRight, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { cn } from '../ui/utils';
+import { useApp } from '../../context/AppContext';
+
+const PAGE_LABELS: Record<string, string> = {
+  'dashboard': 'Dashboard',
+  'employee-portal': 'Employee Portal',
+  'service-catalog': 'Service Catalog',
+  'dynamic-form': 'Submit Request',
+  'my-requests': 'My Requests',
+  'request-detail': 'Request Details',
+  'approvals': 'Approvals',
+  'workflow-pipeline': 'Workflow Pipeline',
+  'work-queue': 'Work Queue',
+  'form-builder': 'Form Builder',
+  'audit-log': 'Audit Log',
+  'settings': 'Settings',
+};
+
+const BREADCRUMB_PARENTS: Record<string, string[]> = {
+  'dynamic-form': ['service-catalog'],
+  'request-detail': ['my-requests'],
+};
+
+export function AppHeader() {
+  const { currentPage, navigate, isDark, toggleDark, searchQuery, setSearchQuery, currentUser } = useApp();
+  const [showSearch, setShowSearch] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+
+  const parents = BREADCRUMB_PARENTS[currentPage] ?? [];
+  const pageTitle = PAGE_LABELS[currentPage] ?? currentPage;
+
+  return (
+    <header className="h-14 bg-card border-b border-border flex items-center px-6 gap-4 sticky top-0 z-30">
+      {/* Breadcrumb */}
+      <div className="flex items-center gap-1.5 flex-1 min-w-0">
+        {parents.map((parent) => (
+          <React.Fragment key={parent}>
+            <button
+              onClick={() => navigate(parent as never)}
+              className="text-muted-foreground hover:text-foreground transition-colors"
+              style={{ fontSize: '13px' }}
+            >
+              {PAGE_LABELS[parent]}
+            </button>
+            <ChevronRight className="size-3.5 text-muted-foreground" />
+          </React.Fragment>
+        ))}
+        <h1 className="text-foreground" style={{ fontSize: '14px', fontWeight: 500 }}>{pageTitle}</h1>
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center gap-2 shrink-0">
+        {/* Search */}
+        <AnimatePresence mode="wait">
+          {showSearch ? (
+            <motion.div
+              key="search-input"
+              initial={{ width: 0, opacity: 0 }}
+              animate={{ width: 240, opacity: 1 }}
+              exit={{ width: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="flex items-center gap-2 h-8 px-3 rounded-lg bg-muted border border-border">
+                <Search className="size-3.5 text-muted-foreground shrink-0" />
+                <input
+                  autoFocus
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  placeholder="Search requests, employees..."
+                  className="flex-1 bg-transparent text-foreground placeholder:text-muted-foreground outline-none"
+                  style={{ fontSize: '13px' }}
+                />
+                <button onClick={() => { setShowSearch(false); setSearchQuery(''); }}>
+                  <X className="size-3.5 text-muted-foreground hover:text-foreground" />
+                </button>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.button
+              key="search-btn"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowSearch(true)}
+              className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Search"
+            >
+              <Search className="size-4" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        {/* Notifications */}
+        <div className="relative">
+          <button
+            onClick={() => setShowNotifications(!showNotifications)}
+            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors relative"
+            title="Notifications"
+          >
+            <Bell className="size-4" />
+            <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-destructive" />
+          </button>
+          <AnimatePresence>
+            {showNotifications && (
+              <motion.div
+                initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                animate={{ opacity: 1, y: 0, scale: 1 }}
+                exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                transition={{ duration: 0.15 }}
+                className="absolute right-0 top-full mt-2 w-72 bg-card border border-border rounded-xl shadow-lg overflow-hidden z-50"
+              >
+                <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+                  <span style={{ fontSize: '13px', fontWeight: 500 }} className="text-foreground">Notifications</span>
+                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary" style={{ fontSize: '10px', fontWeight: 600 }}>3 New</span>
+                </div>
+                {[
+                  { title: 'Leave request pending', desc: 'Arjun Sharma - waiting for HOD approval', time: '5m ago', dot: 'bg-amber-500' },
+                  { title: 'WiFi request approved', desc: 'Rahul Gupta - VPN access granted', time: '1h ago', dot: 'bg-emerald-500' },
+                  { title: 'SLA breach warning', desc: 'REQ-2024-0001 approaching deadline', time: '2h ago', dot: 'bg-red-500' },
+                ].map((n, i) => (
+                  <div key={i} className="px-4 py-3 flex gap-3 hover:bg-muted/50 cursor-pointer transition-colors">
+                    <div className={cn('size-2 rounded-full mt-1.5 shrink-0', n.dot)} />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-foreground truncate" style={{ fontSize: '12px', fontWeight: 500 }}>{n.title}</p>
+                      <p className="text-muted-foreground truncate" style={{ fontSize: '11px' }}>{n.desc}</p>
+                      <p className="text-muted-foreground" style={{ fontSize: '10px' }}>{n.time}</p>
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+
+        {/* Dark mode */}
+        <button
+          onClick={toggleDark}
+          className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+          title="Toggle theme"
+        >
+          {isDark ? <Sun className="size-4" /> : <Moon className="size-4" />}
+        </button>
+
+        {/* Avatar */}
+        {currentUser && (
+          <div
+            className="size-8 rounded-full bg-primary flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
+            title={currentUser.name}
+          >
+            <span className="text-primary-foreground font-semibold" style={{ fontSize: '11px' }}>{currentUser.initials}</span>
+          </div>
+        )}
+      </div>
+    </header>
+  );
+}
