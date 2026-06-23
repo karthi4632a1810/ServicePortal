@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ChevronLeft, Send, CheckCircle, Clock, Info, Upload,
-  User, Building2, Mail, Phone, MapPin, Briefcase, AlertCircle,
+  Building2, AlertCircle,
 } from 'lucide-react';
 import { LottiePlayer } from '../components/animations/LottiePlayer';
 import { RippleButton } from '../components/animations/RippleButton';
@@ -10,52 +11,35 @@ import { FloatingParticles } from '../components/animations/FloatingOrbs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_EMPLOYEES } from '../data/mockData';
-import type { FormField, FormSchema } from '../types';
+import { api } from '../services/api';
+import { getEmployeeProfile, saveEmployeeProfile } from '../utils/employeeAutofillDb';
+import { buildFormAutofill, normalizePhoneInput } from '../utils/hrmsFormAutofill';
+import { getEffectiveHrmsSource, normalizeFormFields } from '../utils/hrmsFormFields';
+import {
+  ensureStaffVerificationFields,
+  getPhoneFromAnswers,
+  getStaffIdFromAnswers,
+} from '../utils/hrmsVerificationFields';
+import type { FormField, FormSchema, FieldOption } from '../types';
 
-function EmployeeInfoPanel() {
-  const emp = MOCK_EMPLOYEES[0];
-  return (
-    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
-      <div className="flex items-center gap-3 mb-3">
-        <div className="size-10 rounded-full bg-primary flex items-center justify-center">
-          <span className="text-primary-foreground font-bold" style={{ fontSize: '13px' }}>{emp.avatar}</span>
-        </div>
-        <div>
-          <p className="text-foreground" style={{ fontSize: '13px', fontWeight: 600 }}>{emp.name}</p>
-          <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{emp.id}</p>
-        </div>
-        <div className="ml-auto px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
-          style={{ fontSize: '10px', fontWeight: 600 }}>ACTIVE</div>
-      </div>
-      <div className="grid grid-cols-2 gap-2">
-        {[
-          { icon: Building2, label: emp.department },
-          { icon: Briefcase, label: emp.designation },
-          { icon: Mail, label: emp.email },
-          { icon: Phone, label: emp.mobile },
-          { icon: MapPin, label: emp.branch },
-          { icon: User, label: `HOD: ${emp.hod}` },
-        ].map(({ icon: Icon, label }) => (
-          <div key={label} className="flex items-center gap-2 text-muted-foreground" style={{ fontSize: '11px' }}>
-            <Icon className="size-3 shrink-0" />
-            <span className="truncate">{label}</span>
-          </div>
-        ))}
-      </div>
-      <p className="mt-2 text-muted-foreground flex items-center gap-1" style={{ fontSize: '10px' }}>
-        <Info className="size-3" /> Employee details are auto-filled from HRMS and cannot be edited.
-      </p>
-    </div>
-  );
-}
-
-function FormFieldRenderer({ field, value, onChange }: {
+function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesignations, selectedDepartmentId, hrmsFound }: {
   field: FormField;
   value: unknown;
   onChange: (val: unknown) => void;
+  hrmsDepartments: FieldOption[];
+  hrmsDesignations: FieldOption[];
+  selectedDepartmentId: string;
+  hrmsFound?: boolean | null;
 }) {
-  const baseInput = "w-full h-10 px-3 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all";
+  const hrmsSource = getEffectiveHrmsSource(field);
+  const isVerificationField = hrmsSource === 'staff_id' || hrmsSource === 'phone';
+  const isVerified = isVerificationField && hrmsFound === true;
+  const inputClass = cn(
+    'w-full h-10 px-3 rounded-lg border bg-input-background text-foreground placeholder:text-muted-foreground transition-all',
+    isVerified
+      ? 'border-emerald-500 outline outline-1 outline-emerald-500 focus:border-emerald-500'
+      : 'border-border outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary',
+  );
   const baseTextarea = "w-full px-3 py-2 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none";
 
   if (field.type === 'section_title') {
@@ -70,14 +54,16 @@ function FormFieldRenderer({ field, value, onChange }: {
     return <div className="col-span-full border-t border-border" />;
   }
 
-  if (field.type === 'employee_info') {
-    return <div className="col-span-full"><EmployeeInfoPanel /></div>;
-  }
-
-  const widthClass = field.width === 'half' ? '' : field.width === 'third' ? '' : 'col-span-full';
+  const widthClass = field.width === 'full' || !field.width ? 'col-span-full' : '';
+  const dropdownOptions = getEffectiveHrmsSource(field) === 'department'
+    ? hrmsDepartments
+    : getEffectiveHrmsSource(field) === 'designation'
+      ? hrmsDesignations
+      : (field.options ?? []);
+  const designationDisabled = getEffectiveHrmsSource(field) === 'designation' && !selectedDepartmentId;
 
   return (
-    <div className={cn(field.width === 'full' || !field.width ? 'col-span-full' : '')}>
+    <div className={widthClass}>
       <label className="block mb-1.5 text-foreground" style={{ fontSize: '12px', fontWeight: 500 }}>
         {field.label}
         {field.required && <span className="text-destructive ml-1">*</span>}
@@ -89,7 +75,7 @@ function FormFieldRenderer({ field, value, onChange }: {
           value={value as string ?? ''}
           onChange={e => onChange(e.target.value)}
           placeholder={field.placeholder}
-          className={baseInput}
+          className={inputClass}
           style={{ fontSize: '13px' }}
         />
       ) : field.type === 'textarea' ? (
@@ -106,18 +92,23 @@ function FormFieldRenderer({ field, value, onChange }: {
           type={field.type}
           value={value as string ?? ''}
           onChange={e => onChange(e.target.value)}
-          className={baseInput}
+          className={inputClass}
           style={{ fontSize: '13px' }}
         />
       ) : field.type === 'dropdown' ? (
         <select
           value={value as string ?? ''}
           onChange={e => onChange(e.target.value)}
-          className={cn(baseInput, 'cursor-pointer')}
+          disabled={designationDisabled}
+          className={cn(inputClass, 'cursor-pointer', designationDisabled && 'opacity-60 cursor-not-allowed')}
           style={{ fontSize: '13px' }}
         >
-          <option value="">{field.placeholder ?? 'Select an option'}</option>
-          {field.options?.map(opt => (
+          <option value="">
+            {getEffectiveHrmsSource(field) === 'designation' && !selectedDepartmentId
+              ? 'Select department first'
+              : field.placeholder ?? 'Select an option'}
+          </option>
+          {dropdownOptions.map(opt => (
             <option key={opt.value} value={opt.value}>{opt.label}</option>
           ))}
         </select>
@@ -204,27 +195,148 @@ function FormFieldRenderer({ field, value, onChange }: {
 }
 
 export function DynamicFormPage() {
-  const { selectedForm, navigate, requests, setRequests } = useApp();
+  const { selectedForm, navigate, submitRequest, pageParams, currentUser, forms, setSelectedForm, fetchEmployee } = useApp();
+  const routerNavigate = useNavigate();
+  const { formId } = useParams();
+  const location = useLocation();
+  const isPublicForm = location.pathname.startsWith('/forms/');
+
   const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [submitted, setSubmitted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [submittedRequestNumber, setSubmittedRequestNumber] = useState('');
+  const [hrmsLoading, setHrmsLoading] = useState(false);
+  const [hrmsFound, setHrmsFound] = useState<boolean | null>(null);
+  const [hrmsError, setHrmsError] = useState<string | null>(null);
+  const [hrmsDepartments, setHrmsDepartments] = useState<FieldOption[]>([]);
+  const [hrmsDesignations, setHrmsDesignations] = useState<FieldOption[]>([]);
 
-  if (!selectedForm) {
-    navigate('service-catalog');
+  const form: FormSchema | null = isPublicForm
+    ? forms.find(f => f.id === formId) ?? null
+    : selectedForm;
+
+  const normalizedFields = useMemo(
+    () => (form ? ensureStaffVerificationFields(normalizeFormFields(form.fields)) : []),
+    [form],
+  );
+
+  const staffId = getStaffIdFromAnswers(normalizedFields, formData);
+  const phone = getPhoneFromAnswers(normalizedFields, formData);
+
+  useEffect(() => {
+    if (isPublicForm && form) {
+      setSelectedForm(form);
+    }
+  }, [isPublicForm, form, setSelectedForm]);
+
+  useEffect(() => {
+    let active = true;
+    getEmployeeProfile().then(profile => {
+      if (!active || !profile) return;
+      const staffField = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'staff_id');
+      const phoneField = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'phone');
+      setFormData(prev => ({
+        ...prev,
+        ...(staffField ? { [staffField.id]: profile.employeeId } : {}),
+        ...(phoneField ? { [phoneField.id]: profile.phone } : {}),
+      }));
+    });
+    return () => { active = false; };
+  }, [normalizedFields]);
+
+  useEffect(() => {
+    const id = staffId;
+    const ph = normalizePhoneInput(phone);
+
+    if (!id || ph.length < 10) {
+      setHrmsFound(null);
+      setHrmsError(null);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      setHrmsLoading(true);
+      setHrmsError(null);
+      try {
+        const emp = await fetchEmployee(id, phone);
+        if (!emp) {
+          setHrmsFound(false);
+          setHrmsError('Employee not found in HRMS');
+          return;
+        }
+        setHrmsFound(true);
+        const autofill = buildFormAutofill(emp, normalizedFields);
+        setFormData(prev => ({ ...prev, ...autofill }));
+      } catch (err) {
+        setHrmsFound(false);
+        setHrmsError(err instanceof Error ? err.message : 'HRMS verification failed');
+      } finally {
+        setHrmsLoading(false);
+      }
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [staffId, phone, fetchEmployee, normalizedFields]);
+
+  const departmentFieldId = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'department')?.id;
+  const selectedDepartmentId = departmentFieldId ? String(formData[departmentFieldId] ?? '') : '';
+
+  useEffect(() => {
+    api.getDepartments()
+      .then(res => setHrmsDepartments(res.data.map(d => ({ label: d.name, value: String(d.id) }))))
+      .catch(() => setHrmsDepartments([]));
+  }, []);
+
+  useEffect(() => {
+    if (!selectedDepartmentId) {
+      setHrmsDesignations([]);
+      return;
+    }
+    api.getDesignations(selectedDepartmentId)
+      .then(res => setHrmsDesignations(res.data.map(d => ({ label: d.name, value: String(d.id) }))))
+      .catch(() => setHrmsDesignations([]));
+  }, [selectedDepartmentId]);
+
+  if (!form) {
+    if (isPublicForm) {
+      routerNavigate('/', { replace: true });
+    } else {
+      navigate('service-catalog');
+    }
     return null;
   }
 
-  const form: FormSchema = selectedForm;
+  const goBack = () => {
+    if (isPublicForm) {
+      routerNavigate('/');
+    } else {
+      navigate('service-catalog');
+    }
+  };
 
   const handleFieldChange = (fieldId: string, value: unknown) => {
-    setFormData(prev => ({ ...prev, [fieldId]: value }));
+    const changedField = normalizedFields.find(f => f.id === fieldId);
+    setFormData(prev => {
+      const next = { ...prev, [fieldId]: value };
+      if (getEffectiveHrmsSource(changedField!) === 'department') {
+        normalizedFields
+          .filter(f => getEffectiveHrmsSource(f) === 'designation')
+          .forEach(f => { next[f.id] = ''; });
+      }
+      return next;
+    });
     if (errors[fieldId]) setErrors(prev => { const n = { ...prev }; delete n[fieldId]; return n; });
   };
 
   const validate = () => {
     const errs: Record<string, string> = {};
-    form.fields.forEach(f => {
+    if (!staffId) errs._hrms = 'Staff ID is required';
+    if (!phone) errs._hrms = 'Phone number is required';
+    if (normalizePhoneInput(phone).length < 10) errs._hrms = 'Enter a valid 10-digit phone number';
+    if (hrmsFound !== true) errs._hrms = hrmsError || 'Verify your Staff ID and phone number against HRMS before submitting';
+    normalizedFields.forEach(f => {
+      if (getEffectiveHrmsSource(f) === 'staff_id' || getEffectiveHrmsSource(f) === 'phone') return;
       if (f.required && ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time', 'dropdown', 'radio'].includes(f.type)) {
         if (!formData[f.id]) errs[f.id] = `${f.label} is required`;
       }
@@ -232,20 +344,30 @@ export function DynamicFormPage() {
     return errs;
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const errs = validate();
     if (Object.keys(errs).length > 0) {
       setErrors(errs);
       return;
     }
     setSubmitting(true);
-    setTimeout(() => {
-      setSubmitting(false);
-      setSubmitted(true);
-    }, 1200);
-  };
+    try {
+      await saveEmployeeProfile({ employeeId: staffId, phone });
 
-  const reqNum = React.useRef(`REQ-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 9000) + 1000)}`);
+      const result = await submitRequest({
+        employeeId: staffId,
+        formId: form.id,
+        answers: formData,
+        priority: 'medium',
+      });
+      setSubmittedRequestNumber(result.requestNumber);
+      setSubmitted(true);
+    } catch {
+      setErrors({ _form: 'Failed to submit request. Please try again.' });
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (submitted) {
     return (
@@ -278,7 +400,7 @@ export function DynamicFormPage() {
             className="text-muted-foreground mb-1"
             style={{ fontSize: '14px' }}
           >
-            Your service request has been successfully submitted.
+            Your form has been successfully submitted.
           </motion.p>
 
           <motion.div
@@ -288,7 +410,7 @@ export function DynamicFormPage() {
             className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-primary/10 text-primary my-5 border border-primary/20"
             style={{ fontSize: '14px', fontWeight: 700, letterSpacing: '0.02em' }}
           >
-            {reqNum.current}
+            {submittedRequestNumber}
           </motion.div>
 
           <motion.p
@@ -308,12 +430,15 @@ export function DynamicFormPage() {
             transition={{ delay: 0.8 }}
             className="flex gap-3 justify-center"
           >
-            <RippleButton variant="primary" onClick={() => navigate('my-requests')}>
-              Track Request
+            <RippleButton variant="primary" onClick={() => {
+              if (isPublicForm) routerNavigate('/login');
+              else navigate('my-requests');
+            }}>
+              {isPublicForm ? 'Sign In to Track' : 'Track Request'}
             </RippleButton>
             <RippleButton
               variant="ghost"
-              onClick={() => { setSubmitted(false); setFormData({}); navigate('service-catalog'); }}
+              onClick={() => { setSubmitted(false); setFormData({}); goBack(); }}
             >
               New Request
             </RippleButton>
@@ -327,16 +452,16 @@ export function DynamicFormPage() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-6 max-w-[800px] space-y-5"
+      className="p-6 w-full space-y-5"
     >
       {/* Back */}
       <button
-        onClick={() => navigate('service-catalog')}
+        onClick={goBack}
         className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors"
         style={{ fontSize: '13px' }}
       >
         <ChevronLeft className="size-4" />
-        Back to Service Catalog
+        {isPublicForm ? 'Back to Home' : 'Back to Form Catalog'}
       </button>
 
       {/* Form Header */}
@@ -344,7 +469,7 @@ export function DynamicFormPage() {
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
             <div className="size-12 rounded-xl bg-primary/10 flex items-center justify-center shrink-0">
-              <User className="size-5 text-primary" />
+              <Building2 className="size-5 text-primary" />
             </div>
             <div>
               <h1 className="text-foreground" style={{ fontSize: '18px', fontWeight: 600 }}>{form.title}</h1>
@@ -388,12 +513,16 @@ export function DynamicFormPage() {
       <Card className="border-border/60 shadow-sm">
         <CardContent className="pt-6">
           <div className="grid grid-cols-2 gap-x-4 gap-y-5">
-            {form.fields.map((field) => (
+            {normalizedFields.map((field) => (
               <FormFieldRenderer
                 key={field.id}
                 field={field}
                 value={formData[field.id]}
                 onChange={(val) => handleFieldChange(field.id, val)}
+                hrmsDepartments={hrmsDepartments}
+                hrmsDesignations={hrmsDesignations}
+                selectedDepartmentId={selectedDepartmentId}
+                hrmsFound={hrmsFound}
               />
             ))}
           </div>
@@ -407,7 +536,7 @@ export function DynamicFormPage() {
           By submitting, you confirm the above information is accurate.
         </p>
         <div className="flex gap-3">
-          <RippleButton variant="ghost" onClick={() => navigate('service-catalog')}>
+          <RippleButton variant="ghost" onClick={goBack}>
             Cancel
           </RippleButton>
           <RippleButton

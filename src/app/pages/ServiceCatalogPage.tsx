@@ -1,34 +1,18 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   Wifi, Mail, Clock, CalendarOff, IndianRupee, Monitor,
   Search, ChevronRight, Sparkles, Tag,
 } from 'lucide-react';
+import { useNavigate } from 'react-router';
+import { APP_NAME, DEFAULT_FORM_CATEGORY, getHrmsDepartmentTagStyle } from '../utils/branding';
+import { DepartmentTag } from '../components/common/DepartmentTag';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_FORMS } from '../data/mockData';
 import type { FormSchema } from '../types';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Wifi, Mail, Clock, CalendarOff, IndianRupee, Monitor,
-};
-
-const CATEGORY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  'IT Services': { bg: 'bg-blue-50 dark:bg-blue-950', text: 'text-blue-700 dark:text-blue-300', border: 'border-blue-200 dark:border-blue-800' },
-  'HR Services': { bg: 'bg-purple-50 dark:bg-purple-950', text: 'text-purple-700 dark:text-purple-300', border: 'border-purple-200 dark:border-purple-800' },
-  'Finance Services': { bg: 'bg-emerald-50 dark:bg-emerald-950', text: 'text-emerald-700 dark:text-emerald-300', border: 'border-emerald-200 dark:border-emerald-800' },
-};
-
-const CATEGORY_ICON_BG: Record<string, string> = {
-  'IT Services': 'bg-blue-100 dark:bg-blue-900',
-  'HR Services': 'bg-purple-100 dark:bg-purple-900',
-  'Finance Services': 'bg-emerald-100 dark:bg-emerald-900',
-};
-
-const CATEGORY_ICON_COLOR: Record<string, string> = {
-  'IT Services': 'text-blue-600 dark:text-blue-400',
-  'HR Services': 'text-purple-600 dark:text-purple-400',
-  'Finance Services': 'text-emerald-600 dark:text-emerald-400',
 };
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.05 } } };
@@ -36,9 +20,9 @@ const fadeUp = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0 } };
 
 function FormCard({ form, onClick }: { form: FormSchema; onClick: () => void }) {
   const Icon = ICON_MAP[form.icon] ?? Sparkles;
-  const cat = CATEGORY_COLORS[form.category] ?? { bg: 'bg-gray-50', text: 'text-gray-700', border: 'border-gray-200' };
-  const iconBg = CATEGORY_ICON_BG[form.category] ?? 'bg-gray-100';
-  const iconColor = CATEGORY_ICON_COLOR[form.category] ?? 'text-gray-600';
+  const deptStyle = form.departmentId
+    ? getHrmsDepartmentTagStyle(form.departmentId)
+    : null;
 
   return (
     <motion.div
@@ -49,13 +33,17 @@ function FormCard({ form, onClick }: { form: FormSchema; onClick: () => void }) 
       className="group cursor-pointer bg-card rounded-xl border border-border/60 p-5 flex flex-col gap-4 transition-colors hover:border-primary/40"
     >
       <div className="flex items-start justify-between">
-        <div className={cn('size-11 rounded-xl flex items-center justify-center', iconBg)}>
-          <Icon className={cn('size-5', iconColor)} />
+        <div className={cn('size-11 rounded-xl flex items-center justify-center bg-muted')}>
+          <Icon className={cn('size-5 text-primary')} />
         </div>
         <div className="flex items-center gap-2">
-          <span className={cn('px-2.5 py-0.5 rounded-full border text-xs font-medium', cat.bg, cat.text, cat.border)}>
-            {form.category}
-          </span>
+          {form.departmentId ? (
+            <DepartmentTag departmentId={form.departmentId} department={form.department} />
+          ) : (
+            <span className={cn('px-2.5 py-0.5 rounded-full border text-xs font-medium', deptStyle?.bg, deptStyle?.text, deptStyle?.border)}>
+              {form.department}
+            </span>
+          )}
         </div>
       </div>
 
@@ -84,40 +72,54 @@ function FormCard({ form, onClick }: { form: FormSchema; onClick: () => void }) 
 }
 
 export function ServiceCatalogPage() {
-  const { navigate, setSelectedForm } = useApp();
+  const { navigate, setSelectedForm, forms, refreshForms, error, loading } = useApp();
+  const routerNavigate = useNavigate();
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [activeDepartment, setActiveDepartment] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const categories = ['All', ...Array.from(new Set(MOCK_FORMS.map(f => f.category)))];
+  useEffect(() => {
+    if (forms.length === 0 && !loading) {
+      setRefreshing(true);
+      refreshForms().finally(() => setRefreshing(false));
+    }
+  }, [forms.length, loading, refreshForms]);
 
-  const filtered = MOCK_FORMS.filter(f => {
+  const departments = ['All', ...Array.from(new Set(forms.map(f => f.department).filter(Boolean))).sort()];
+
+  const filtered = forms.filter(f => {
     const matchSearch = !search || f.title.toLowerCase().includes(search.toLowerCase()) || f.description.toLowerCase().includes(search.toLowerCase());
-    const matchCat = !activeCategory || activeCategory === 'All' || f.category === activeCategory;
-    return matchSearch && matchCat && f.active;
+    const matchDept = !activeDepartment || activeDepartment === 'All' || f.department === activeDepartment;
+    return matchSearch && matchDept && f.active;
   });
 
   const grouped = filtered.reduce<Record<string, FormSchema[]>>((acc, form) => {
-    if (!acc[form.category]) acc[form.category] = [];
-    acc[form.category].push(form);
+    const group = form.department || DEFAULT_FORM_CATEGORY;
+    if (!acc[group]) acc[group] = [];
+    acc[group].push(form);
     return acc;
   }, {});
 
   const handleFormSelect = (form: FormSchema) => {
     setSelectedForm(form);
-    navigate('dynamic-form');
+    if (window.location.pathname.startsWith('/admin')) {
+      navigate('dynamic-form');
+    } else {
+      routerNavigate(`/forms/${form.id}`);
+    }
   };
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 space-y-6 max-w-[1200px]"
+      className="p-6 space-y-6 w-full"
     >
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
-        <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Service Catalog</h1>
+        <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Forms</h1>
         <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
-          Browse and submit service requests across IT, HR, Finance and other departments.
+          Browse and submit {APP_NAME} forms — no login required. Your employee ID is saved locally for faster form filling.
         </p>
       </motion.div>
 
@@ -129,32 +131,32 @@ export function ServiceCatalogPage() {
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Search services..."
+            placeholder="Search forms..."
             className="w-64 h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
             style={{ fontSize: '13px' }}
           />
         </div>
 
         <div className="flex items-center gap-2">
-          {categories.map(cat => (
+          {departments.map(dept => (
             <button
-              key={cat}
-              onClick={() => setActiveCategory(cat === 'All' ? null : cat)}
+              key={dept}
+              onClick={() => setActiveDepartment(dept === 'All' ? null : dept)}
               className={cn(
                 'px-3 py-1.5 rounded-lg border transition-colors',
-                (cat === 'All' && !activeCategory) || cat === activeCategory
+                (dept === 'All' && !activeDepartment) || dept === activeDepartment
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/40'
               )}
               style={{ fontSize: '12px', fontWeight: 500 }}
             >
-              {cat}
+              {dept}
             </button>
           ))}
         </div>
 
         <div className="ml-auto text-muted-foreground" style={{ fontSize: '12px' }}>
-          {filtered.length} service{filtered.length !== 1 ? 's' : ''} available
+          {filtered.length} form{filtered.length !== 1 ? 's' : ''} available
         </div>
       </motion.div>
 
@@ -162,23 +164,38 @@ export function ServiceCatalogPage() {
       {filtered.length === 0 ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="py-20 text-center">
           <Sparkles className="size-12 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No services found</p>
-          <p className="text-muted-foreground" style={{ fontSize: '12px' }}>Try adjusting your search or filter</p>
+          <p className="text-muted-foreground" style={{ fontSize: '14px' }}>
+            {refreshing || loading ? 'Loading forms...' : 'No forms found'}
+          </p>
+          <p className="text-muted-foreground" style={{ fontSize: '12px' }}>
+            {error
+              ? `Could not reach the API: ${error}`
+              : 'Try adjusting your search or filter'}
+          </p>
+          {!loading && !refreshing && (
+            <button
+              onClick={() => { setRefreshing(true); refreshForms().finally(() => setRefreshing(false)); }}
+              className="mt-4 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+              style={{ fontSize: '13px', fontWeight: 500 }}
+            >
+              Retry
+            </button>
+          )}
         </motion.div>
       ) : (
         <div className="space-y-8">
-          {Object.entries(grouped).map(([category, forms]) => (
-            <motion.div key={category} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
+          {Object.entries(grouped).map(([department, forms]) => (
+            <motion.div key={department} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
               <div className="flex items-center gap-3 mb-4">
-                <h2 className="text-foreground" style={{ fontSize: '15px', fontWeight: 600 }}>{category}</h2>
+                <h2 className="text-foreground" style={{ fontSize: '15px', fontWeight: 600 }}>{department}</h2>
                 <div className="h-px flex-1 bg-border" />
-                <span className="text-muted-foreground" style={{ fontSize: '11px' }}>{forms.length} service{forms.length !== 1 ? 's' : ''}</span>
+                <span className="text-muted-foreground" style={{ fontSize: '11px' }}>{forms.length} form{forms.length !== 1 ? 's' : ''}</span>
               </div>
               <motion.div
                 variants={stagger}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
               >
                 {forms.map(form => (
                   <FormCard key={form.id} form={form} onClick={() => handleFormSelect(form)} />

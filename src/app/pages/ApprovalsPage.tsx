@@ -7,7 +7,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_REQUESTS } from '../data/mockData';
+import type { Request } from '../types';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -18,10 +18,15 @@ const PRIORITY_COLORS = {
   low: 'text-gray-600 bg-gray-100 dark:bg-gray-800',
 };
 
-function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: () => void }) {
+function ApprovalCard({ req, onView, onAction }: {
+  req: Request;
+  onView: () => void;
+  onAction: (action: 'approve' | 'reject' | 'forward' | 'request-info', remarks: string) => Promise<void>;
+}) {
   const [remarksOpen, setRemarksOpen] = useState(false);
   const [remarks, setRemarks] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
   const currentStep = req.workflow[req.currentStep - 1];
   const submittedDaysAgo = Math.floor((Date.now() - new Date(req.submittedAt).getTime()) / 86400000);
@@ -120,7 +125,7 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
         <div className="flex gap-2 flex-wrap">
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => { setActiveAction('approve'); setRemarksOpen(a => !a); }}
+            onClick={() => { setActiveAction('approve'); setRemarksOpen(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
             style={{ fontSize: '12px', fontWeight: 500 }}
           >
@@ -129,7 +134,7 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => { setActiveAction('reject'); setRemarksOpen(a => !a); }}
+            onClick={() => { setActiveAction('reject'); setRemarksOpen(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white transition-colors"
             style={{ fontSize: '12px', fontWeight: 500 }}
           >
@@ -138,7 +143,7 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-            onClick={() => { setActiveAction('sendback'); setRemarksOpen(a => !a); }}
+            onClick={() => { setActiveAction('request-info'); setRemarksOpen(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-orange-300 text-orange-700 hover:bg-orange-50 dark:text-orange-400 dark:border-orange-700 dark:hover:bg-orange-950 transition-colors"
             style={{ fontSize: '12px', fontWeight: 500 }}
           >
@@ -147,6 +152,7 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
           </motion.button>
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={() => { setActiveAction('forward'); setRemarksOpen(true); }}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             style={{ fontSize: '12px' }}
           >
@@ -154,6 +160,35 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
             Forward
           </motion.button>
         </div>
+        <div className="flex items-center gap-2">
+          {remarksOpen && activeAction && (
+            <motion.button
+              whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+              disabled={submitting}
+              onClick={async () => {
+                setSubmitting(true);
+                try {
+                  const actionMap: Record<string, 'approve' | 'reject' | 'forward' | 'request-info'> = {
+                    approve: 'approve',
+                    reject: 'reject',
+                    forward: 'forward',
+                    'request-info': 'request-info',
+                  };
+                  const action = actionMap[activeAction];
+                  if (action) await onAction(action, remarks);
+                  setRemarksOpen(false);
+                  setRemarks('');
+                  setActiveAction(null);
+                } finally {
+                  setSubmitting(false);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+            >
+              {submitting ? 'Saving...' : 'Confirm'}
+            </motion.button>
+          )}
         <button
           onClick={onView}
           className="flex items-center gap-1.5 text-primary hover:underline"
@@ -162,13 +197,14 @@ function ApprovalCard({ req, onView }: { req: typeof MOCK_REQUESTS[0]; onView: (
           <Eye className="size-3.5" />
           Full Details
         </button>
+        </div>
       </div>
     </motion.div>
   );
 }
 
 export function ApprovalsPage() {
-  const { navigate, setSelectedRequest, requests } = useApp();
+  const { navigate, setSelectedRequest, requests, performApprovalAction } = useApp();
   const [tab, setTab] = useState<'pending' | 'approved' | 'rejected' | 'all'>('pending');
   const [search, setSearch] = useState('');
 
@@ -183,17 +219,17 @@ export function ApprovalsPage() {
     return !q || r.formTitle.toLowerCase().includes(q) || r.employee.name.toLowerCase().includes(q) || r.requestNumber.toLowerCase().includes(q);
   });
 
-  const handleView = (req: typeof MOCK_REQUESTS[0]) => {
+  const handleView = (req: Request) => {
     setSelectedRequest(req);
     navigate('request-detail');
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 max-w-[900px]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 w-full">
       {/* Header */}
       <div>
         <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Approvals</h1>
-        <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Review and action pending service requests</p>
+        <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Review and action pending forms</p>
       </div>
 
       {/* Tabs */}
@@ -244,7 +280,12 @@ export function ApprovalsPage() {
       ) : (
         <motion.div variants={stagger} initial="hidden" animate="show" className="space-y-4">
           {filtered.map(req => (
-            <ApprovalCard key={req.id} req={req} onView={() => handleView(req)} />
+            <ApprovalCard
+              key={req.id}
+              req={req}
+              onView={() => handleView(req)}
+              onAction={(action, remarks) => performApprovalAction(req.id, action, remarks)}
+            />
           ))}
         </motion.div>
       )}

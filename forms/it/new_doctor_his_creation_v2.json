@@ -1,0 +1,232 @@
+{
+  "id": "form-it-doctor-his",
+  "title": "New Doctor Name and ID Creation in HIS",
+  "departmentId": "14",
+  "department": "Information Technology",
+  "icon": "FileText",
+  "description": "Request creation of a new doctor name and ID in the Hospital Information System (HIS) at Om Sakthi Adhiparasakthi Hospitals.",
+  "category": "Forms",
+  "version": 2,
+  "estimatedTime": "1-2 business days",
+  "slaHours": 72,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Employee Information",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f3",
+      "type": "section_title",
+      "label": "Doctor HIS Creation Details",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f6",
+      "type": "text",
+      "label": "First Name",
+      "required": true,
+      "placeholder": "Enter first name",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f7",
+      "type": "text",
+      "label": "Last Name",
+      "required": true,
+      "placeholder": "Enter last name",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f5",
+      "type": "date",
+      "label": "Request Date",
+      "required": true,
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f8",
+      "type": "dropdown",
+      "label": "Gender",
+      "required": true,
+      "width": "half",
+      "options": [
+        {
+          "label": "Male",
+          "value": "male"
+        },
+        {
+          "label": "Female",
+          "value": "female"
+        },
+        {
+          "label": "Other",
+          "value": "other"
+        }
+      ]
+    },
+    {
+      "id": "f9",
+      "type": "date",
+      "label": "DOB (Date of Birth)",
+      "required": true,
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f10",
+      "type": "date",
+      "label": "DOJ (Date of Joining)",
+      "required": true,
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f11",
+      "type": "text",
+      "label": "Qualification",
+      "required": true,
+      "placeholder": "e.g. MBBS, MD, MS",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f12",
+      "type": "text",
+      "label": "Registration No.",
+      "required": true,
+      "placeholder": "Medical council registration number",
+      "helpText": "State medical council registration number",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f13",
+      "type": "dropdown",
+      "label": "Department",
+      "required": true,
+      "placeholder": "Select department",
+      "width": "half",
+      "options": [],
+      "hrmsSource": "department"
+    },
+    {
+      "id": "f14",
+      "type": "dropdown",
+      "label": "Marital Status",
+      "required": true,
+      "width": "half",
+      "options": [
+        {
+          "label": "Single",
+          "value": "single"
+        },
+        {
+          "label": "Married",
+          "value": "married"
+        },
+        {
+          "label": "Divorced",
+          "value": "divorced"
+        },
+        {
+          "label": "Widowed",
+          "value": "widowed"
+        }
+      ]
+    },
+    {
+      "id": "f15",
+      "type": "textarea",
+      "label": "Address",
+      "required": true,
+      "placeholder": "Enter full residential address",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f17",
+      "type": "dropdown",
+      "label": "Designation",
+      "required": true,
+      "placeholder": "Select designation",
+      "width": "half",
+      "options": [],
+      "hrmsSource": "designation"
+    },
+    {
+      "id": "f18",
+      "type": "text",
+      "label": "Job Function",
+      "required": true,
+      "placeholder": "e.g. Outpatient, Inpatient, Emergency",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f19",
+      "type": "text",
+      "label": "Unit",
+      "required": true,
+      "placeholder": "e.g. Unit I, Unit II, Main Hospital",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f20",
+      "type": "section_title",
+      "label": "Additional Information",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f21",
+      "type": "textarea",
+      "label": "Remarks / Special Instructions",
+      "required": false,
+      "placeholder": "Any additional notes for HR or IT...",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f22",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "required": false,
+      "helpText": "Optional: registration certificate, appointment letter, or HR approval",
+      "width": "full",
+      "options": []
+    }
+  ]
+}

@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
-  Search, User, Building2, Mail, Phone, MapPin, Briefcase,
-  ChevronRight, FileText, Clock, CheckCircle, XCircle, Loader2,
+  Search, User, ChevronRight, FileText, Clock, CheckCircle, XCircle, Loader2,
   AlertCircle, Shield,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_EMPLOYEES, MOCK_REQUESTS } from '../data/mockData';
+import { api } from '../services/api';
 import type { Employee, Request } from '../types';
+import { getEmployeeProfileFields } from '../utils/employeeProfileFields';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
@@ -119,41 +119,41 @@ function RequestStatusCard({ req }: { req: Request }) {
 }
 
 export function EmployeePortalPage() {
-  const { navigate, setSelectedForm } = useApp();
+  const { navigate, fetchEmployee } = useApp();
   const [employeeId, setEmployeeId] = useState('');
   const [foundEmployee, setFoundEmployee] = useState<Employee | null>(null);
+  const [employeeRequests, setEmployeeRequests] = useState<Request[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [error, setError] = useState('');
 
-  const handleSearch = () => {
+  const handleSearch = async () => {
     if (!employeeId.trim()) {
       setError('Please enter your Employee ID');
       return;
     }
     setIsSearching(true);
     setError('');
-    setTimeout(() => {
-      const emp = MOCK_EMPLOYEES.find(e =>
-        e.id.toLowerCase() === employeeId.trim().toLowerCase()
-      );
-      setIsSearching(false);
+    try {
+      const emp = await fetchEmployee(employeeId.trim());
       if (emp) {
         setFoundEmployee(emp);
-      } else {
-        setError('Employee ID not found. Please check and try again.');
+        const res = await api.getEmployeeRequests(employeeId.trim());
+        setEmployeeRequests(res.data);
       }
-    }, 800);
+    } catch {
+      setFoundEmployee(null);
+      setEmployeeRequests([]);
+      setError('Employee ID not found. Please check and try again.');
+    } finally {
+      setIsSearching(false);
+    }
   };
-
-  const employeeRequests = foundEmployee
-    ? MOCK_REQUESTS.filter(r => r.employee.id === foundEmployee.id)
-    : [];
 
   return (
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 max-w-[900px] space-y-6"
+      className="p-6 w-full space-y-6"
     >
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -164,7 +164,7 @@ export function EmployeePortalPage() {
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Employee Portal</h1>
         </div>
         <p className="text-muted-foreground ml-11" style={{ fontSize: '13px' }}>
-          No login required. Enter your Employee ID to view and track your service requests.
+          No login required. Enter your Employee ID to view and track your forms.
         </p>
       </motion.div>
 
@@ -179,7 +179,7 @@ export function EmployeePortalPage() {
                   value={employeeId}
                   onChange={e => { setEmployeeId(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  placeholder="Enter Employee ID (e.g., EMP001)"
+                  placeholder="Enter Staff ID (e.g., 60464)"
                   className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                   style={{ fontSize: '14px' }}
                 />
@@ -211,7 +211,7 @@ export function EmployeePortalPage() {
 
             <p className="text-muted-foreground mt-3" style={{ fontSize: '11px' }}>
               <Shield className="size-3 inline mr-1" />
-              Try: EMP001, EMP002, EMP003, EMP004, or EMP005
+              Use your HRMS staff ID and registered mobile number (e.g. 60464)
             </p>
           </CardContent>
         </Card>
@@ -238,23 +238,25 @@ export function EmployeePortalPage() {
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-3 flex-wrap">
                       <h2 className="text-foreground" style={{ fontSize: '18px', fontWeight: 600 }}>{foundEmployee.name}</h2>
-                      <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400"
+                      <span className={cn(
+                        'px-2.5 py-0.5 rounded-full',
+                        foundEmployee.status === 'active'
+                          ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400'
+                          : 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+                      )}
                         style={{ fontSize: '11px', fontWeight: 600 }}>
-                        ACTIVE
+                        {foundEmployee.status === 'active' ? 'ACTIVE' : 'INACTIVE'}
                       </span>
                     </div>
                     <p className="text-muted-foreground" style={{ fontSize: '13px' }}>{foundEmployee.designation}</p>
-                    <p className="text-primary" style={{ fontSize: '12px' }}>{foundEmployee.id}</p>
+                    <p className="text-primary" style={{ fontSize: '12px' }}>Staff ID: {foundEmployee.id}</p>
                   </div>
                 </div>
 
                 <div className="mt-5 grid grid-cols-2 md:grid-cols-3 gap-4">
-                  <InfoRow icon={Building2} label="Department" value={foundEmployee.department} />
-                  <InfoRow icon={MapPin} label="Branch" value={foundEmployee.branch} />
-                  <InfoRow icon={Briefcase} label="Reporting Manager" value={foundEmployee.reportingManager} />
-                  <InfoRow icon={Mail} label="Email" value={foundEmployee.email} />
-                  <InfoRow icon={Phone} label="Mobile" value={foundEmployee.mobile} />
-                  <InfoRow icon={User} label="HOD" value={foundEmployee.hod} />
+                  {getEmployeeProfileFields(foundEmployee).map((field) => (
+                    <InfoRow key={field.label} icon={field.icon} label={field.label} value={field.value} />
+                  ))}
                 </div>
               </CardContent>
             </Card>
@@ -301,7 +303,7 @@ export function EmployeePortalPage() {
                     <FileText className="size-10 text-muted-foreground/30 mx-auto mb-3" />
                     <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No requests found</p>
                     <p className="text-muted-foreground" style={{ fontSize: '12px' }}>
-                      Submit your first service request to get started
+                      Submit your first form to get started
                     </p>
                   </div>
                 )}

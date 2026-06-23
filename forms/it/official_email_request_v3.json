@@ -1,0 +1,141 @@
+{
+  "id": "form-it-email",
+  "title": "Official Email Request",
+  "department": "Information Technology",
+  "icon": "Mail",
+  "description": "Request official email ID creation for staff at Om Sakthi Adhiparasakthi Hospitals.",
+  "category": "Forms",
+  "version": 3,
+  "estimatedTime": "1-2 business days",
+  "slaHours": 48,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Employee Information",
+      "width": "full"
+    },
+    {
+      "id": "f3",
+      "type": "section_title",
+      "label": "E-Mail Request Details",
+      "width": "full"
+    },
+    {
+      "id": "f4",
+      "type": "date",
+      "label": "Date",
+      "required": true,
+      "width": "half"
+    },
+    {
+      "id": "f5",
+      "type": "text",
+      "label": "Name",
+      "required": true,
+      "width": "half",
+      "placeholder": "Full name as per HRMS"
+    },
+    {
+      "id": "f7",
+      "type": "dropdown",
+      "label": "Department",
+      "hrmsSource": "department",
+      "required": true,
+      "width": "half",
+      "placeholder": "Select department",
+      "options": []
+    },
+    {
+      "id": "f8",
+      "type": "dropdown",
+      "label": "Designation",
+      "hrmsSource": "designation",
+      "required": true,
+      "width": "half",
+      "placeholder": "Select designation",
+      "options": []
+    },
+    {
+      "id": "f9",
+      "type": "date",
+      "label": "Date of Joining",
+      "required": true,
+      "width": "half"
+    },
+    {
+      "id": "f11",
+      "type": "phone",
+      "label": "CUG No.",
+      "width": "half",
+      "placeholder": "CUG number if assigned",
+      "helpText": "Official CUG mobile number, if applicable"
+    },
+    {
+      "id": "f12",
+      "type": "text",
+      "label": "Preferred Email Prefix",
+      "width": "half",
+      "placeholder": "e.g. firstname.lastname",
+      "helpText": "Suggested email ID before @domain"
+    },
+    {
+      "id": "f13",
+      "type": "textarea",
+      "label": "Remarks",
+      "width": "full",
+      "placeholder": "Any additional requirements for IT..."
+    },
+    {
+      "id": "f14",
+      "type": "section_title",
+      "label": "For Office Use Only",
+      "width": "full"
+    },
+    {
+      "id": "f15",
+      "type": "date",
+      "label": "Date of Creation",
+      "width": "half",
+      "helpText": "Office use — filled by IT after email is created"
+    },
+    {
+      "id": "f16",
+      "type": "email",
+      "label": "E-Mail ID",
+      "width": "half",
+      "placeholder": "e.g. name@mapims.org",
+      "helpText": "Office use — assigned official email address"
+    },
+    {
+      "id": "f17",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "width": "full",
+      "helpText": "Optional: HOD approval or appointment letter"
+    }
+  ],
+  "departmentId": "14"
+}

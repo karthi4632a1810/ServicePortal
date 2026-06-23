@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ClipboardList } from 'lucide-react';
 import { FloatingOrbs } from './FloatingOrbs';
+import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 
 interface LoadingScreenProps {
   onComplete?: () => void;
@@ -9,8 +10,8 @@ interface LoadingScreenProps {
 }
 
 const LOADING_STEPS = [
-  'Initializing portal...',
-  'Loading service catalog...',
+  'Initializing PaperZero...',
+  'Loading forms...',
   'Connecting to HRMS...',
   'Ready!',
 ];
@@ -91,9 +92,9 @@ export function LoadingScreen({ onComplete, duration = 2800 }: LoadingScreenProp
             className="text-center mb-10"
           >
             <h1 className="text-foreground mb-1" style={{ fontSize: '26px', fontWeight: 700, letterSpacing: '-0.02em' }}>
-              ServicePortal
+              {APP_NAME}
             </h1>
-            <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Enterprise Edition · v3.0</p>
+            <p className="text-muted-foreground" style={{ fontSize: '13px' }}>{APP_TAGLINE}</p>
           </motion.div>
 
           {/* Progress bar */}

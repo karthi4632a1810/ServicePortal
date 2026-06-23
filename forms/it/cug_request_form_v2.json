@@ -1,0 +1,135 @@
+{
+  "id": "form-it-cug-request",
+  "title": "CUG Request Form",
+  "departmentId": "14",
+  "department": "Information Technology",
+  "icon": "FileText",
+  "description": "Request a Closed User Group (CUG) mobile connection for staff at Om Sakthi Adhiparasakthi Hospitals.",
+  "category": "Forms",
+  "version": 2,
+  "estimatedTime": "1-2 business days",
+  "slaHours": 72,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Employee Information",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f3",
+      "type": "section_title",
+      "label": "CUG Request Details",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f4",
+      "type": "date",
+      "label": "Date",
+      "required": true,
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f5",
+      "type": "text",
+      "label": "Name",
+      "required": true,
+      "placeholder": "Full name as per HRMS",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f13",
+      "type": "phone",
+      "label": "CUG Mobile No.",
+      "required": false,
+      "placeholder": "Filled by IT after approval",
+      "helpText": "Office use — assigned CUG mobile number",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f7",
+      "type": "dropdown",
+      "label": "Department",
+      "required": true,
+      "placeholder": "Select department",
+      "width": "half",
+      "options": [],
+      "hrmsSource": "department"
+    },
+    {
+      "id": "f8",
+      "type": "dropdown",
+      "label": "Designation",
+      "required": true,
+      "placeholder": "Select designation",
+      "width": "half",
+      "options": [],
+      "hrmsSource": "designation"
+    },
+    {
+      "id": "f10",
+      "type": "textarea",
+      "label": "Purpose",
+      "required": true,
+      "placeholder": "Reason for CUG connection request...",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f11",
+      "type": "section_title",
+      "label": "For Office Use Only",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f12",
+      "type": "text",
+      "label": "SIM No.",
+      "required": false,
+      "placeholder": "Filled by IT after approval",
+      "helpText": "Office use — assigned SIM number",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f14",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "required": false,
+      "helpText": "Optional: HOD approval or supporting document",
+      "width": "full",
+      "options": []
+    }
+  ]
+}

@@ -3,9 +3,19 @@
   "private": true,
   "version": "0.0.1",
   "type": "module",
+  "packageManager": "pnpm@11.6.0",
+  "engines": {
+    "node": ">=18",
+    "pnpm": ">=9"
+  },
   "scripts": {
     "build": "vite build",
-    "dev": "vite"
+    "dev": "node scripts/kill-port.mjs 5173 && vite",
+    "dev:backend": "node scripts/kill-port.mjs 5000 && pnpm --filter service-portal-backend dev",
+    "start:backend": "node scripts/kill-port.mjs 5000 && pnpm --filter service-portal-backend start",
+    "seed": "pnpm --filter service-portal-backend seed",
+    "seed:users": "pnpm --filter service-portal-backend seed:users",
+    "sync:forms": "pnpm --filter service-portal-backend sync:forms"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",
@@ -81,11 +91,6 @@
     },
     "react-dom": {
       "optional": true
-    }
-  },
-  "pnpm": {
-    "overrides": {
-      "vite": "6.3.5"
     }
   }
 }

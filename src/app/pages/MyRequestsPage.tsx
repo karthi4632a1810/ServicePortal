@@ -124,7 +124,8 @@ const ALL_STATUSES: Array<{ value: string; label: string }> = [
 ];
 
 export function MyRequestsPage() {
-  const { requests, navigate, setSelectedRequest } = useApp();
+  const { requests, navigate, setSelectedRequest, currentUser } = useApp();
+  const isEmployee = currentUser?.role === 'employee';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
@@ -154,12 +155,16 @@ export function MyRequestsPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 max-w-[1200px]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>My Requests</h1>
-          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Track and manage all service requests</p>
+          <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>
+            {isEmployee ? 'My Requests' : 'All Requests'}
+          </h1>
+          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
+            {isEmployee ? 'Track your submitted forms' : 'Track and manage all forms'}
+          </p>
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}

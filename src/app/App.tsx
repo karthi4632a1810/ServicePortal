@@ -1,10 +1,15 @@
 import React, { useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Toaster } from 'sonner';
 import { AppProvider, useApp } from './context/AppContext';
+import { canAccessPage, getDefaultPage } from './utils/roleAccess';
+import { PublicLayout } from './components/layout/PublicLayout';
+import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { LoadingScreen } from './components/animations/LoadingScreen';
+import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EmployeePortalPage } from './pages/EmployeePortalPage';
 import { ServiceCatalogPage } from './pages/ServiceCatalogPage';
@@ -18,7 +23,6 @@ import { FormBuilderPage } from './pages/FormBuilderPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SettingsPage } from './pages/SettingsPage';
 
-/* ── Page transition config ──────────────────────────────────── */
 const PAGE_VARIANTS = {
   initial: { opacity: 0, y: 16, filter: 'blur(3px)' },
   animate: {
@@ -31,9 +35,14 @@ const PAGE_VARIANTS = {
   },
 };
 
-/* ── Page router ─────────────────────────────────────────────── */
 function PageRouter() {
-  const { currentPage } = useApp();
+  const { currentPage, currentUser, navigate } = useApp();
+
+  React.useEffect(() => {
+    if (currentUser && !canAccessPage(currentUser.role, currentPage)) {
+      navigate(getDefaultPage(currentUser.role));
+    }
+  }, [currentPage, currentUser, navigate]);
 
   const renderPage = () => {
     switch (currentPage) {
@@ -70,44 +79,81 @@ function PageRouter() {
   );
 }
 
-/* ── App shell ───────────────────────────────────────────────── */
-function AppShell() {
+function AdminShell() {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
-      className="flex h-screen overflow-hidden bg-background"
-    >
-      <AppSidebar />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
-        <AppHeader />
-        <main className="flex-1 overflow-auto">
-          <PageRouter />
-        </main>
-      </div>
-    </motion.div>
+    <div className="h-screen w-full overflow-hidden bg-background">
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.4, ease: [0.25, 0.46, 0.45, 0.94] }}
+        className="flex h-full w-full max-w-[1920px] mx-auto overflow-hidden"
+      >
+        <AppSidebar />
+        <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+          <AppHeader />
+          <main className="flex-1 overflow-auto">
+            <PageRouter />
+          </main>
+        </div>
+      </motion.div>
+    </div>
   );
 }
 
-/* ── Root with loading screen ────────────────────────────────── */
-export default function App() {
+function AppRoutes() {
+  return (
+    <Routes>
+      <Route
+        path="/"
+        element={
+          <PublicLayout>
+            <ServiceCatalogPage />
+          </PublicLayout>
+        }
+      />
+      <Route path="/login" element={<LoginPage />} />
+      <Route
+        path="/forms/:formId"
+        element={
+          <PublicLayout>
+            <DynamicFormPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/admin/*"
+        element={
+          <ProtectedRoute>
+            <AdminShell />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="*" element={<Navigate to="/" replace />} />
+    </Routes>
+  );
+}
+
+function AppContent() {
   const [ready, setReady] = useState(false);
 
   return (
-    <AppProvider>
+    <>
       <AnimatePresence mode="wait">
         {!ready ? (
-          <LoadingScreen key="loading" onComplete={() => setReady(true)} duration={2600} />
+          <div key="loading" className="h-screen w-full bg-background">
+            <div className="h-full w-full max-w-[1920px] mx-auto">
+              <LoadingScreen onComplete={() => setReady(true)} duration={2600} />
+            </div>
+          </div>
         ) : (
           <motion.div
             key="app"
-            className="h-full"
+            className="h-full w-full"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.35 }}
           >
-            <AppShell />
+            <AppRoutes />
           </motion.div>
         )}
       </AnimatePresence>
@@ -125,6 +171,16 @@ export default function App() {
           },
         }}
       />
-    </AppProvider>
+    </>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </BrowserRouter>
   );
 }

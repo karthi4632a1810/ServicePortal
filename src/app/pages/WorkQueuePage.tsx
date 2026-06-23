@@ -1,13 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import {
   Layers, Clock, CheckCircle, XCircle, Loader2,
-  User, Calendar, Play, Pause, Check, Search,
+  User, Calendar, Play, Check, Search,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_REQUESTS } from '../data/mockData';
+import { api } from '../services/api';
 
 type QueueStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
 
@@ -24,24 +23,6 @@ interface QueueItem {
   submittedAt: string;
 }
 
-const QUEUE_ITEMS: QueueItem[] = [
-  {
-    id: 'q1', requestNumber: 'REQ-2024-0002', title: 'WiFi / Network Access Request',
-    employee: 'Rahul Gupta', department: 'Finance', assignedTo: 'Deepak Nair',
-    queueStatus: 'in_progress', priority: 'low', dueDate: '2024-06-16', submittedAt: '2024-06-14',
-  },
-  {
-    id: 'q2', requestNumber: 'REQ-2024-0005', title: 'Official Email ID Request',
-    employee: 'Priya Patel', department: 'Human Resources', assignedTo: 'Deepak Nair',
-    queueStatus: 'pending', priority: 'medium', dueDate: '2024-06-16', submittedAt: '2024-06-15',
-  },
-  {
-    id: 'q3', requestNumber: 'REQ-2024-0003', title: 'Salary / Travel Advance Request',
-    employee: 'Sneha Reddy', department: 'Operations', assignedTo: 'Kiran Reddy',
-    queueStatus: 'completed', priority: 'high', dueDate: '2024-06-13', submittedAt: '2024-06-10',
-  },
-];
-
 const STATUS_CONFIG: Record<QueueStatus, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   pending: { label: 'Pending', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950' },
   in_progress: { label: 'In Progress', icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
@@ -49,9 +30,10 @@ const STATUS_CONFIG: Record<QueueStatus, { label: string; icon: React.ElementTyp
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800' },
 };
 
-function KanbanColumn({ title, items, status, color, onStatusChange }: {
+function KanbanColumn({ title, items, status, color, onStatusChange, updating }: {
   title: string; items: QueueItem[]; status: QueueStatus; color: string;
   onStatusChange: (id: string, newStatus: QueueStatus) => void;
+  updating: string | null;
 }) {
   return (
     <div className="flex-1 min-w-[220px]">
@@ -64,6 +46,7 @@ function KanbanColumn({ title, items, status, color, onStatusChange }: {
         {items.map(item => {
           const cfg = STATUS_CONFIG[item.queueStatus];
           const Icon = cfg.icon;
+          const isUpdating = updating === item.id;
           return (
             <motion.div
               key={item.id}
@@ -87,7 +70,7 @@ function KanbanColumn({ title, items, status, color, onStatusChange }: {
                   <User className="size-3" />{item.employee}
                 </div>
                 <div className="flex items-center gap-1 text-muted-foreground" style={{ fontSize: '10px' }}>
-                  <Calendar className="size-3" />Due: {new Date(item.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                  <Calendar className="size-3" />Due: {item.dueDate ? new Date(item.dueDate).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—'}
                 </div>
               </div>
               <div className="mt-2 pt-2 border-t border-border/50 flex items-center gap-2">
@@ -97,8 +80,9 @@ function KanbanColumn({ title, items, status, color, onStatusChange }: {
                 <span className="text-muted-foreground flex-1 truncate" style={{ fontSize: '10px' }}>{item.assignedTo}</span>
                 {item.queueStatus === 'pending' && (
                   <button
+                    disabled={isUpdating}
                     onClick={() => onStatusChange(item.id, 'in_progress')}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
                     style={{ fontSize: '10px' }}
                   >
                     <Play className="size-2.5" /> Start
@@ -106,8 +90,9 @@ function KanbanColumn({ title, items, status, color, onStatusChange }: {
                 )}
                 {item.queueStatus === 'in_progress' && (
                   <button
+                    disabled={isUpdating}
                     onClick={() => onStatusChange(item.id, 'completed')}
-                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 text-white hover:opacity-90 transition-opacity"
+                    className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                     style={{ fontSize: '10px' }}
                   >
                     <Check className="size-2.5" /> Done
@@ -128,11 +113,47 @@ function KanbanColumn({ title, items, status, color, onStatusChange }: {
 }
 
 export function WorkQueuePage() {
-  const [items, setItems] = useState<QueueItem[]>(QUEUE_ITEMS);
+  const { refreshRequests } = useApp();
+  const [items, setItems] = useState<QueueItem[]>([]);
   const [search, setSearch] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState<string | null>(null);
 
-  const handleStatusChange = (id: string, newStatus: QueueStatus) => {
-    setItems(prev => prev.map(item => item.id === id ? { ...item, queueStatus: newStatus } : item));
+  useEffect(() => {
+    async function load() {
+      setLoading(true);
+      try {
+        const res = await api.getDepartmentQueue('IT');
+        setItems(res.data as unknown as QueueItem[]);
+      } catch {
+        setItems([]);
+      } finally {
+        setLoading(false);
+      }
+    }
+    load();
+  }, []);
+
+  const handleStatusChange = async (id: string, newStatus: QueueStatus) => {
+    setUpdating(id);
+    try {
+      const res = await api.updateQueueStatus(id, { queueStatus: newStatus });
+      const updated = res.data;
+      setItems(prev => prev.map(item =>
+        item.id === id
+          ? {
+              ...item,
+              queueStatus: (updated.queueStatus as QueueStatus) || newStatus,
+              assignedTo: updated.assignedTo || item.assignedTo,
+            }
+          : item
+      ));
+      await refreshRequests();
+    } catch {
+      // keep UI unchanged on failure
+    } finally {
+      setUpdating(null);
+    }
   };
 
   const filtered = items.filter(i =>
@@ -143,11 +164,10 @@ export function WorkQueuePage() {
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Work Queue</h1>
-          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Processing queue for approved service requests</p>
+          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Processing queue for approved forms</p>
         </div>
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
@@ -161,37 +181,47 @@ export function WorkQueuePage() {
         </div>
       </div>
 
-      {/* Kanban Board */}
-      <div className="flex gap-4 overflow-x-auto pb-4">
-        <KanbanColumn
-          title="Pending"
-          items={byStatus('pending')}
-          status="pending"
-          color="bg-amber-50 dark:bg-amber-950/50"
-          onStatusChange={handleStatusChange}
-        />
-        <KanbanColumn
-          title="In Progress"
-          items={byStatus('in_progress')}
-          status="in_progress"
-          color="bg-blue-50 dark:bg-blue-950/50"
-          onStatusChange={handleStatusChange}
-        />
-        <KanbanColumn
-          title="Completed"
-          items={byStatus('completed')}
-          status="completed"
-          color="bg-emerald-50 dark:bg-emerald-950/50"
-          onStatusChange={handleStatusChange}
-        />
-        <KanbanColumn
-          title="Cancelled"
-          items={byStatus('cancelled')}
-          status="cancelled"
-          color="bg-gray-100 dark:bg-gray-800/50"
-          onStatusChange={handleStatusChange}
-        />
-      </div>
+      {loading ? (
+        <div className="flex items-center justify-center py-20 text-muted-foreground">
+          <Loader2 className="size-6 animate-spin mr-2" />
+          Loading queue...
+        </div>
+      ) : (
+        <div className="flex gap-4 overflow-x-auto pb-4">
+          <KanbanColumn
+            title="Pending"
+            items={byStatus('pending')}
+            status="pending"
+            color="bg-amber-50 dark:bg-amber-950/50"
+            onStatusChange={handleStatusChange}
+            updating={updating}
+          />
+          <KanbanColumn
+            title="In Progress"
+            items={byStatus('in_progress')}
+            status="in_progress"
+            color="bg-blue-50 dark:bg-blue-950/50"
+            onStatusChange={handleStatusChange}
+            updating={updating}
+          />
+          <KanbanColumn
+            title="Completed"
+            items={byStatus('completed')}
+            status="completed"
+            color="bg-emerald-50 dark:bg-emerald-950/50"
+            onStatusChange={handleStatusChange}
+            updating={updating}
+          />
+          <KanbanColumn
+            title="Cancelled"
+            items={byStatus('cancelled')}
+            status="cancelled"
+            color="bg-gray-100 dark:bg-gray-800/50"
+            onStatusChange={handleStatusChange}
+            updating={updating}
+          />
+        </div>
+      )}
     </motion.div>
   );
 }

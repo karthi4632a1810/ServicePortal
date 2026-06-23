@@ -7,7 +7,7 @@ import { useApp } from '../../context/AppContext';
 const PAGE_LABELS: Record<string, string> = {
   'dashboard': 'Dashboard',
   'employee-portal': 'Employee Portal',
-  'service-catalog': 'Service Catalog',
+  'service-catalog': 'Form Catalog',
   'dynamic-form': 'Submit Request',
   'my-requests': 'My Requests',
   'request-detail': 'Request Details',

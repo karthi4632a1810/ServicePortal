@@ -1,14 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import {
   Plus, Trash2, GripVertical, ChevronDown, Settings, Eye,
   Save, Wrench, Type, AlignLeft, Hash, Mail, Phone, Calendar,
   Clock, ChevronRight, CheckSquare, List, Upload, Divide, Tag,
-  ToggleLeft, Minus, User,
+  ToggleLeft, Minus, User, History, FileText, Loader2,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
-import { MOCK_FORMS } from '../data/mockData';
+import { api } from '../services/api';
+import type { FormField } from '../types';
+import { normalizeFormField, normalizeFormFields } from '../utils/hrmsFormFields';
+import { createStaffVerificationFields, ensureStaffVerificationFields, isStaffVerificationField } from '../utils/hrmsVerificationFields';
+import { DEFAULT_FORM_CATEGORY, LEGACY_OWNER_DEPT_MAP } from '../utils/branding';
+import { DepartmentTag } from '../components/common/DepartmentTag';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '../components/ui/select';
 
 type FieldType = 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'date' | 'time' | 'dropdown' | 'multiselect' | 'radio' | 'checkbox' | 'file' | 'section_title' | 'divider';
 
@@ -21,6 +33,23 @@ interface BuilderField {
   helpText: string;
   options: string[];
   width: 'full' | 'half';
+  hrmsSource?: 'staff_id' | 'phone' | 'department' | 'designation';
+  locked?: boolean;
+}
+
+function createDefaultBuilderFields(): BuilderField[] {
+  return createStaffVerificationFields().map((field) => ({
+    id: field.id,
+    type: field.type as FieldType,
+    label: field.label,
+    required: true,
+    placeholder: field.placeholder ?? '',
+    helpText: field.helpText ?? '',
+    options: [],
+    width: 'half',
+    hrmsSource: field.hrmsSource,
+    locked: true,
+  }));
 }
 
 const FIELD_PALETTE: Array<{ type: FieldType; label: string; icon: React.ElementType; color: string }> = [
@@ -50,6 +79,54 @@ const defaultField = (type: FieldType): BuilderField => ({
   options: type === 'dropdown' || type === 'radio' || type === 'checkbox' || type === 'multiselect' ? ['Option 1', 'Option 2'] : [],
   width: 'full',
 });
+
+interface BuilderFormMeta {
+  formId: string;
+  title: string;
+  departmentId?: string;
+  department: string;
+  currentVersion: number;
+  category?: string;
+  slaHours?: number;
+  description?: string;
+}
+
+interface VersionMeta {
+  version: number;
+  filename: string;
+  publishedAt?: string;
+  changelog?: string;
+  isCurrent: boolean;
+}
+
+function schemaFieldsToBuilder(fields: FormField[]): BuilderField[] {
+  return ensureStaffVerificationFields(normalizeFormFields(fields)).map((f) => ({
+    id: f.id,
+    type: (f.type === 'employee_info' || f.type === 'readonly' || f.type === 'hidden' || f.type === 'signature' ? 'section_title' : f.type) as FieldType,
+    label: f.label,
+    required: f.required ?? false,
+    placeholder: f.placeholder ?? '',
+    helpText: f.helpText ?? '',
+    options: f.options?.map((o) => o.label) ?? [],
+    width: f.width === 'half' ? 'half' : 'full',
+    hrmsSource: f.hrmsSource,
+    locked: isStaffVerificationField(f),
+  }));
+}
+
+function builderFieldsToSchema(fields: BuilderField[]): FormField[] {
+  return ensureStaffVerificationFields(fields.map((f) => normalizeFormField({
+    id: f.id,
+    type: f.type,
+    label: f.label,
+    required: f.required,
+    placeholder: f.placeholder || undefined,
+    helpText: f.helpText || undefined,
+    width: f.width,
+    hrmsSource: f.hrmsSource,
+    options: f.options.map((o, i) => ({ label: o, value: o.toLowerCase().replace(/\s+/g, '_') || `opt_${i}` })),
+  })));
+}
 
 function PaletteItem({ type, label, icon: Icon, color, onAdd }: {
   type: FieldType; label: string; icon: React.ElementType; color: string; onAdd: (t: FieldType) => void;
@@ -96,15 +173,18 @@ function FieldEditor({ field, onChange, onDelete }: {
             <p className="text-foreground truncate" style={{ fontSize: '13px', fontWeight: 500 }}>{field.label}</p>
             <p className="text-muted-foreground" style={{ fontSize: '10px' }}>
               {field.type.replace(/_/g, ' ')} · {field.width} · {field.required ? 'Required' : 'Optional'}
+              {field.locked ? ' · Locked' : ''}
             </p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(); }}
-              className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
-            >
-              <Trash2 className="size-3.5" />
-            </button>
+            {!field.locked && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onDelete(); }}
+                className="size-7 flex items-center justify-center rounded-lg text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+              >
+                <Trash2 className="size-3.5" />
+              </button>
+            )}
             <ChevronRight className={cn('size-4 text-muted-foreground transition-transform', expanded && 'rotate-90')} />
           </div>
         </div>
@@ -125,7 +205,8 @@ function FieldEditor({ field, onChange, onDelete }: {
                     <input
                       value={field.label}
                       onChange={e => onChange({ ...field, label: e.target.value })}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      disabled={field.locked}
+                      className="w-full h-8 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-60"
                       style={{ fontSize: '12px' }}
                     />
                   </div>
@@ -143,7 +224,8 @@ function FieldEditor({ field, onChange, onDelete }: {
                     <select
                       value={field.width}
                       onChange={e => onChange({ ...field, width: e.target.value as 'full' | 'half' })}
-                      className="w-full h-8 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                      disabled={field.locked}
+                      className="w-full h-8 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-60"
                       style={{ fontSize: '12px' }}
                     >
                       <option value="full">Full Width</option>
@@ -156,6 +238,7 @@ function FieldEditor({ field, onChange, onDelete }: {
                         type="checkbox"
                         checked={field.required}
                         onChange={e => onChange({ ...field, required: e.target.checked })}
+                        disabled={field.locked}
                         className="accent-primary"
                       />
                       <span className="text-foreground" style={{ fontSize: '12px' }}>Required field</span>
@@ -196,15 +279,96 @@ function FieldEditor({ field, onChange, onDelete }: {
 }
 
 export function FormBuilderPage() {
+  const [builderForms, setBuilderForms] = useState<BuilderFormMeta[]>([]);
+  const [selectedFormId, setSelectedFormId] = useState<string>('');
+  const [versions, setVersions] = useState<VersionMeta[]>([]);
+  const [loadedVersion, setLoadedVersion] = useState<number>(1);
+  const [currentLiveVersion, setCurrentLiveVersion] = useState<number>(1);
   const [formTitle, setFormTitle] = useState('New Service Request Form');
-  const [formDept, setFormDept] = useState('IT');
-  const [fields, setFields] = useState<BuilderField[]>([
-    { ...defaultField('section_title'), label: 'Employee Information', id: 'init-1' },
-    { ...defaultField('text'), label: 'Full Name', required: true, id: 'init-2' },
-    { ...defaultField('email'), label: 'Email Address', required: true, id: 'init-3', width: 'half' },
-  ]);
+  const [formDepartmentId, setFormDepartmentId] = useState(LEGACY_OWNER_DEPT_MAP.IT.id);
+  const [formDepartmentName, setFormDepartmentName] = useState(LEGACY_OWNER_DEPT_MAP.IT.name);
+  const [hrmsDepartments, setHrmsDepartments] = useState<Array<{ id: number; name: string }>>([]);
+  const [slaHours, setSlaHours] = useState(24);
+  const [fields, setFields] = useState<BuilderField[]>(createDefaultBuilderFields());
   const [saved, setSaved] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'build' | 'preview'>('build');
+  const [saveError, setSaveError] = useState('');
+
+  const loadFormList = useCallback(async () => {
+    try {
+      const res = await api.listBuilderForms();
+      setBuilderForms(res.data.map((f) => ({
+        formId: f.formId,
+        title: f.title,
+        departmentId: (f as { departmentId?: string }).departmentId,
+        department: f.department,
+        currentVersion: f.currentVersion,
+        category: f.category,
+        slaHours: f.slaHours,
+      })));
+    } catch {
+      setBuilderForms([]);
+    }
+  }, []);
+
+  useEffect(() => { loadFormList(); }, [loadFormList]);
+
+  useEffect(() => {
+    api.getDepartments()
+      .then((res) => setHrmsDepartments(res.data))
+      .catch(() => setHrmsDepartments([]));
+  }, []);
+
+  const loadVersionIntoEditor = useCallback(async (formId: string, version: number) => {
+    setLoading(true);
+    setSaveError('');
+    try {
+      const res = await api.getFormVersion(formId, version);
+      const { schema, metadata } = res.data;
+      setFormTitle(schema.title);
+      setFormDepartmentId(schema.departmentId || LEGACY_OWNER_DEPT_MAP.IT.id);
+      setFormDepartmentName(schema.department || LEGACY_OWNER_DEPT_MAP.IT.name);
+      setSlaHours(schema.slaHours ?? 24);
+      setFields(schemaFieldsToBuilder(schema.fields));
+      setLoadedVersion(version);
+      setCurrentLiveVersion((metadata as { currentVersion?: number }).currentVersion ?? version);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to load version');
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  const handleSelectForm = async (formId: string) => {
+    setSelectedFormId(formId);
+    if (!formId) return;
+    try {
+      const verRes = await api.listFormVersions(formId);
+      setVersions(verRes.data.versions);
+      setCurrentLiveVersion(verRes.data.currentVersion);
+      await loadVersionIntoEditor(formId, verRes.data.currentVersion);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Failed to load form');
+    }
+  };
+
+  const handleVersionChange = (version: number) => {
+    if (selectedFormId) loadVersionIntoEditor(selectedFormId, version);
+  };
+
+  const handleNewForm = () => {
+    setSelectedFormId('');
+    setVersions([]);
+    setLoadedVersion(1);
+    setCurrentLiveVersion(1);
+    setFormTitle('New Service Request Form');
+    setFormDepartmentId(LEGACY_OWNER_DEPT_MAP.IT.id);
+    setFormDepartmentName(LEGACY_OWNER_DEPT_MAP.IT.name);
+    setSlaHours(24);
+    setFields(createDefaultBuilderFields());
+  };
 
   const addField = (type: FieldType) => {
     setFields(prev => [...prev, defaultField(type)]);
@@ -215,21 +379,52 @@ export function FormBuilderPage() {
   };
 
   const deleteField = (id: string) => {
-    setFields(prev => prev.filter(f => f.id !== id));
+    setFields(prev => {
+      const target = prev.find(f => f.id === id);
+      if (target?.locked) return prev;
+      return prev.filter(f => f.id !== id);
+    });
   };
 
-  const handleSave = () => {
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    try {
+      const res = await api.saveForm({
+        formId: selectedFormId || undefined,
+        title: formTitle,
+        departmentId: formDepartmentId,
+        department: formDepartmentName,
+        slaHours,
+        fields: builderFieldsToSchema(fields),
+        basedOnVersion: selectedFormId ? loadedVersion : undefined,
+      });
+      const newVersion = res.data.schema.version;
+      const formId = res.data.schema.id;
+      setSelectedFormId(formId);
+      setLoadedVersion(newVersion);
+      setCurrentLiveVersion(newVersion);
+      const verRes = await api.listFormVersions(formId);
+      setVersions(verRes.data.versions);
+      await loadFormList();
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : 'Save failed. Log in as admin first.');
+    } finally {
+      setSaving(false);
+    }
   };
+
+  const selectedForm = builderForms.find((f) => f.formId === selectedFormId);
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 max-w-[1200px]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Form Builder</h1>
-          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Create dynamic service request forms with drag-and-drop</p>
+          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Create dynamic forms with drag-and-drop</p>
         </div>
         <div className="flex items-center gap-2">
           {/* Tabs */}
@@ -253,22 +448,106 @@ export function FormBuilderPage() {
           <motion.button
             whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
             onClick={handleSave}
+            disabled={saving || loading}
             className={cn(
-              'flex items-center gap-2 px-4 py-2 rounded-lg transition-all',
+              'flex items-center gap-2 px-4 py-2 rounded-lg transition-all disabled:opacity-60',
               saved ? 'bg-emerald-600 text-white' : 'bg-primary text-primary-foreground hover:opacity-90'
             )}
             style={{ fontSize: '13px', fontWeight: 500 }}
           >
-            <Save className="size-4" />
-            {saved ? 'Saved!' : 'Save Form'}
+            {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+            {saved ? `Saved v${loadedVersion}!` : selectedFormId ? 'Save New Version' : 'Create Form'}
           </motion.button>
         </div>
       </div>
 
+      {/* Form & Version Selector */}
+      <Card className="border-border/60 shadow-sm">
+        <CardContent className="pt-5">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div>
+              <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>SELECT FORM</label>
+              <Select
+                value={selectedFormId || '__new__'}
+                onValueChange={(value) => (value === '__new__' ? handleNewForm() : handleSelectForm(value))}
+              >
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="+ Create New Form">
+                    {selectedForm ? (
+                      <span className="flex items-center gap-2 min-w-0">
+                        <DepartmentTag departmentId={selectedForm.departmentId} department={selectedForm.department} />
+                        <span className="truncate">{selectedForm.title} (v{selectedForm.currentVersion})</span>
+                      </span>
+                    ) : (
+                      '+ Create New Form'
+                    )}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__new__">+ Create New Form</SelectItem>
+                  {builderForms.map((f) => (
+                    <SelectItem key={f.formId} value={f.formId}>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <DepartmentTag departmentId={f.departmentId} department={f.department} />
+                        <span className="truncate">{f.title} (v{f.currentVersion})</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {selectedFormId && versions.length > 0 && (
+              <div>
+                <label className="block mb-1 text-muted-foreground flex items-center gap-1" style={{ fontSize: '11px', fontWeight: 600 }}>
+                  <History className="size-3" /> VERSION
+                </label>
+                <select
+                  value={loadedVersion}
+                  onChange={(e) => handleVersionChange(parseInt(e.target.value, 10))}
+                  disabled={loading}
+                  className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                  style={{ fontSize: '13px' }}
+                >
+                  {versions.map((v) => (
+                    <option key={v.version} value={v.version}>
+                      v{v.version}{v.isCurrent ? ' (live)' : ''} — {v.changelog || v.filename}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            {selectedFormId && (
+              <div className="flex items-end">
+                <div className={cn(
+                  'px-3 py-2 rounded-lg border text-sm w-full',
+                  loadedVersion === currentLiveVersion
+                    ? 'bg-emerald-50 border-emerald-200 text-emerald-800 dark:bg-emerald-950 dark:border-emerald-800 dark:text-emerald-300'
+                    : 'bg-amber-50 border-amber-200 text-amber-800 dark:bg-amber-950 dark:border-amber-800 dark:text-amber-300'
+                )} style={{ fontSize: '12px' }}>
+                  {loadedVersion === currentLiveVersion ? (
+                    <>Editing live version <strong>v{loadedVersion}</strong>. Save creates v{currentLiveVersion + 1}.</>
+                  ) : (
+                    <>Viewing <strong>v{loadedVersion}</strong> (live is v{currentLiveVersion}). Edit & save → creates v{currentLiveVersion + 1}.</>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+          {saveError && (
+            <p className="mt-2 text-destructive" style={{ fontSize: '12px' }}>{saveError}</p>
+          )}
+          {loading && (
+            <p className="mt-2 text-muted-foreground flex items-center gap-2" style={{ fontSize: '12px' }}>
+              <Loader2 className="size-3 animate-spin" /> Loading version...
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Form Meta */}
       <Card className="border-border/60 shadow-sm">
         <CardContent className="pt-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
               <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>FORM TITLE</label>
               <input
@@ -279,33 +558,46 @@ export function FormBuilderPage() {
               />
             </div>
             <div>
-              <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>DEPARTMENT</label>
-              <select
-                value={formDept}
-                onChange={e => setFormDept(e.target.value)}
-                className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
-                style={{ fontSize: '13px' }}
+              <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>
+                DEPARTMENT (HRMS)
+              </label>
+              <Select
+                value={formDepartmentId}
+                onValueChange={(value) => {
+                  const dept = hrmsDepartments.find((d) => String(d.id) === value);
+                  setFormDepartmentId(value);
+                  setFormDepartmentName(dept?.name || value);
+                }}
               >
-                <option>IT</option>
-                <option>HR</option>
-                <option>Finance</option>
-                <option>Operations</option>
-                <option>Admin</option>
-              </select>
-            </div>
-            <div>
-              <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>CATEGORY</label>
-              <select className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30" style={{ fontSize: '13px' }}>
-                <option>IT Services</option>
-                <option>HR Services</option>
-                <option>Finance Services</option>
-              </select>
+                <SelectTrigger className="w-full h-9">
+                  <SelectValue placeholder="Select HRMS department">
+                    <span className="flex items-center gap-2 min-w-0">
+                      <DepartmentTag departmentId={formDepartmentId} department={formDepartmentName} />
+                      <span className="truncate">{formDepartmentName}</span>
+                    </span>
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent className="max-h-72">
+                  {hrmsDepartments.map((dept) => (
+                    <SelectItem key={dept.id} value={String(dept.id)}>
+                      <span className="flex items-center gap-2 min-w-0">
+                        <DepartmentTag departmentId={String(dept.id)} department={dept.name} />
+                        <span className="truncate">{dept.name}</span>
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-muted-foreground" style={{ fontSize: '10px' }}>
+                Owner department from HRMS. All forms are listed under &quot;{DEFAULT_FORM_CATEGORY}&quot;.
+              </p>
             </div>
             <div>
               <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>SLA (HOURS)</label>
               <input
                 type="number"
-                defaultValue={24}
+                value={slaHours}
+                onChange={e => setSlaHours(parseInt(e.target.value, 10) || 24)}
                 className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
                 style={{ fontSize: '13px' }}
               />
@@ -379,7 +671,7 @@ export function FormBuilderPage() {
         </div>
       ) : (
         /* Preview Mode */
-        <Card className="border-border/60 shadow-sm max-w-[700px]">
+        <Card className="border-border/60 shadow-sm w-full">
           <CardHeader>
             <CardTitle>{formTitle}</CardTitle>
             <CardDescription>Preview of how the form will appear to employees</CardDescription>

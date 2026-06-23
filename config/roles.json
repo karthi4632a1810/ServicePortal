@@ -1,0 +1,8 @@
+[
+  { "code": "super_admin", "name": "Super Admin", "description": "Full system control", "level": 110 },
+  { "code": "admin", "name": "Admin", "description": "Full system access", "level": 100 },
+  { "code": "hod", "name": "Head of Department", "description": "Department approval authority", "level": 80 },
+  { "code": "processor", "name": "Department Processor", "description": "Process department queue items", "level": 60 },
+  { "code": "it_team", "name": "IT Team", "description": "IT department processor", "level": 60 },
+  { "code": "employee", "name": "Employee", "description": "Public portal employee", "level": 10 }
+]

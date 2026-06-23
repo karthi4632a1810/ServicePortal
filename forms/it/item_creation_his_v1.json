@@ -1,0 +1,248 @@
+{
+  "id": "form-it-item-creation-his",
+  "title": "Item Creation in HIS",
+  "department": "Information Technology",
+  "icon": "IndianRupee",
+  "description": "Request new item creation in HIS software with billing charges and lab configuration. This request is routed to both IT and Lab departments for processing.",
+  "category": "Forms",
+  "version": 1,
+  "estimatedTime": "3-5 business days",
+  "slaHours": 120,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Item Creation in HIS Software — Routed to IT & Lab",
+      "width": "full"
+    },
+    {
+      "id": "f3",
+      "type": "dropdown",
+      "label": "Department",
+      "hrmsSource": "department",
+      "required": true,
+      "width": "half",
+      "placeholder": "Select department",
+      "helpText": "This request goes to both IT (HIS setup) and Lab (lab configuration) departments",
+      "options": []
+    },
+    {
+      "id": "f4",
+      "type": "text",
+      "label": "Item Name",
+      "required": true,
+      "width": "half",
+      "placeholder": "Full item name for HIS"
+    },
+    {
+      "id": "f5",
+      "type": "text",
+      "label": "Short Name (if any)",
+      "width": "full",
+      "placeholder": "Abbreviated name for HIS display"
+    },
+    {
+      "id": "f6",
+      "type": "section_title",
+      "label": "Charges",
+      "width": "full"
+    },
+    {
+      "id": "f7",
+      "type": "number",
+      "label": "OP Charges",
+      "required": true,
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f8",
+      "type": "number",
+      "label": "General Ward",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f9",
+      "type": "number",
+      "label": "Super Deluxe",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f10",
+      "type": "number",
+      "label": "ICU",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f11",
+      "type": "number",
+      "label": "Insurance",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f12",
+      "type": "number",
+      "label": "Corporate",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f13",
+      "type": "number",
+      "label": "Uthiramerur",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f14",
+      "type": "number",
+      "label": "NRI Charges",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f15",
+      "type": "number",
+      "label": "Venmalagaram",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f16",
+      "type": "number",
+      "label": "Maduranthakam",
+      "width": "half",
+      "placeholder": "0.00"
+    },
+    {
+      "id": "f17",
+      "type": "section_title",
+      "label": "FOR LAB — Lab Department",
+      "width": "full"
+    },
+    {
+      "id": "f18",
+      "type": "text",
+      "label": "Sub Department",
+      "required": true,
+      "width": "half",
+      "placeholder": "Lab sub-department"
+    },
+    {
+      "id": "f19",
+      "type": "text",
+      "label": "Unit",
+      "required": true,
+      "width": "half",
+      "placeholder": "e.g. mg/dL, IU/L"
+    },
+    {
+      "id": "f20",
+      "type": "text",
+      "label": "Specimen",
+      "required": true,
+      "width": "half",
+      "placeholder": "e.g. Blood, Urine, Serum"
+    },
+    {
+      "id": "f21",
+      "type": "text",
+      "label": "Methodology",
+      "required": true,
+      "width": "half",
+      "placeholder": "e.g. ELISA, Automated analyzer"
+    },
+    {
+      "id": "f22",
+      "type": "number",
+      "label": "Decimal Digits",
+      "width": "half",
+      "placeholder": "e.g. 2",
+      "helpText": "Number of decimal places in lab report"
+    },
+    {
+      "id": "f23",
+      "type": "dropdown",
+      "label": "Report Type",
+      "required": true,
+      "width": "half",
+      "options": [
+        {
+          "label": "Template",
+          "value": "template"
+        },
+        {
+          "label": "Dropdown",
+          "value": "dropdown"
+        },
+        {
+          "label": "Culture",
+          "value": "culture"
+        }
+      ]
+    },
+    {
+      "id": "f24",
+      "type": "textarea",
+      "label": "Report Type Details",
+      "width": "full",
+      "placeholder": "Template name, dropdown options, or culture details...",
+      "helpText": "If Template — email the format to itmgmt@mapims.org"
+    },
+    {
+      "id": "f25",
+      "type": "textarea",
+      "label": "Reference Range",
+      "required": true,
+      "width": "full",
+      "placeholder": "Enter normal reference range values"
+    },
+    {
+      "id": "f26",
+      "type": "section_title",
+      "label": "Additional Information",
+      "width": "full"
+    },
+    {
+      "id": "f27",
+      "type": "textarea",
+      "label": "Remarks",
+      "width": "full",
+      "placeholder": "Any additional instructions for IT or Lab..."
+    },
+    {
+      "id": "f28",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "width": "full",
+      "helpText": "Optional: rate card, lab SOP, or template document"
+    }
+  ],
+  "departmentId": "14"
+}

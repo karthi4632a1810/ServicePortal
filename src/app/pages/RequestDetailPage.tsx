@@ -8,7 +8,6 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { MOCK_REQUESTS } from '../data/mockData';
 import type { RequestStatus } from '../types';
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
@@ -48,11 +47,13 @@ function TimelineEvent({ by, role, text, timestamp, type, isLast }: {
 }
 
 export function RequestDetailPage() {
-  const { selectedRequest, navigate } = useApp();
+  const { selectedRequest, navigate, requests, performApprovalAction, currentUser } = useApp();
   const [comment, setComment] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
 
-  const req = selectedRequest ?? MOCK_REQUESTS[0];
+  const req = selectedRequest ?? requests[0];
+  if (!req) return null;
   const statusCfg = STATUS_CONFIG[req.status];
   const StatusIcon = statusCfg.icon;
 
@@ -60,8 +61,29 @@ export function RequestDetailPage() {
     setActiveAction(action === activeAction ? null : action);
   };
 
+  const handleConfirmAction = async () => {
+    if (!activeAction || !req) return;
+    const actionMap: Record<string, 'approve' | 'reject' | 'forward' | 'request-info'> = {
+      approve: 'approve',
+      reject: 'reject',
+      forward: 'forward',
+      info: 'request-info',
+      sendback: 'request-info',
+    };
+    const action = actionMap[activeAction];
+    if (!action) return;
+    setSubmitting(true);
+    try {
+      await performApprovalAction(req.id, action, comment);
+      setActiveAction(null);
+      setComment('');
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6 max-w-[1100px] space-y-5">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6 w-full space-y-5">
       {/* Back + Title */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -168,6 +190,7 @@ export function RequestDetailPage() {
           )}
 
           {/* Approval Actions */}
+          {currentUser?.role !== 'employee' && (
           <Card className="border-border/60 shadow-sm">
             <CardHeader>
               <CardTitle>Actions</CardTitle>
@@ -223,11 +246,13 @@ export function RequestDetailPage() {
                         </button>
                         <motion.button
                           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+                          disabled={submitting}
+                          onClick={handleConfirmAction}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
                           style={{ fontSize: '12px', fontWeight: 500 }}
                         >
                           <Send className="size-3" />
-                          Confirm
+                          {submitting ? 'Processing...' : 'Confirm'}
                         </motion.button>
                       </div>
                     </div>
@@ -236,6 +261,7 @@ export function RequestDetailPage() {
               </AnimatePresence>
             </CardContent>
           </Card>
+          )}
         </div>
 
         {/* Right: Workflow + Timeline */}

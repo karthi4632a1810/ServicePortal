@@ -1,0 +1,114 @@
+{
+  "id": "form-it-wifi",
+  "title": "Employee WIFI Request Form",
+  "department": "Information Technology",
+  "icon": "Wifi",
+  "description": "Request employee WiFi access at Om Sakthi Adhiparasakthi Hospitals. Routed to Head of Department and IT for approval.",
+  "category": "Forms",
+  "version": 4,
+  "estimatedTime": "1-2 business days",
+  "slaHours": 48,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Employee Information",
+      "width": "full"
+    },
+    {
+      "id": "f3",
+      "type": "section_title",
+      "label": "WiFi Request Details",
+      "width": "full"
+    },
+    {
+      "id": "f4",
+      "type": "date",
+      "label": "Date",
+      "required": true,
+      "width": "half"
+    },
+    {
+      "id": "f5",
+      "type": "text",
+      "label": "Employee Name",
+      "required": true,
+      "width": "half",
+      "placeholder": "Full name as per HRMS"
+    },
+    {
+      "id": "f7",
+      "type": "dropdown",
+      "label": "Department",
+      "hrmsSource": "department",
+      "required": true,
+      "width": "half",
+      "placeholder": "Select department",
+      "options": []
+    },
+    {
+      "id": "f8",
+      "type": "dropdown",
+      "label": "Designation",
+      "hrmsSource": "designation",
+      "required": true,
+      "width": "half",
+      "placeholder": "Select designation",
+      "options": []
+    },
+    {
+      "id": "f9",
+      "type": "text",
+      "label": "Device Model",
+      "required": true,
+      "width": "half",
+      "placeholder": "e.g. iPhone 14, Dell Latitude 5420"
+    },
+    {
+      "id": "f11",
+      "type": "text",
+      "label": "MAC Address",
+      "required": true,
+      "width": "half",
+      "placeholder": "XX:XX:XX:XX:XX:XX",
+      "helpText": "Device WiFi MAC address required for network registration"
+    },
+    {
+      "id": "f12",
+      "type": "textarea",
+      "label": "Remarks",
+      "width": "full",
+      "placeholder": "Any additional details for IT..."
+    },
+    {
+      "id": "f13",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "width": "full",
+      "helpText": "Optional: HOD approval or device details"
+    }
+  ],
+  "departmentId": "14"
+}

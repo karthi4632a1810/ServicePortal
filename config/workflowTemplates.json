@@ -1,0 +1,19 @@
+[
+  {
+    "id": "wf-hod-then-processor",
+    "name": "HOD then Department Processor",
+    "description": "Employee HOD approval followed by owning department processing",
+    "steps": [
+      { "name": "HOD Approval", "type": "hod" },
+      { "name": "Department Processing", "type": "department_processor" }
+    ]
+  },
+  {
+    "id": "wf-hod-only",
+    "name": "HOD Approval Only",
+    "description": "Single HOD approval step",
+    "steps": [
+      { "name": "HOD Approval", "type": "hod" }
+    ]
+  }
+]

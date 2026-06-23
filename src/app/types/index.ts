@@ -1,4 +1,4 @@
-export type UserRole = 'admin' | 'hod' | 'it_team' | 'hr_team' | 'finance_team' | 'processor' | 'employee';
+export type UserRole = 'super_admin' | 'admin' | 'hod' | 'it_team' | 'hr_team' | 'finance_team' | 'processor' | 'employee';
 export type RequestStatus = 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'processing' | 'completed' | 'cancelled' | 'sent_back';
 export type FieldType =
   | 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'date' | 'time'
@@ -23,15 +23,39 @@ export type Page =
 export interface Employee {
   id: string;
   name: string;
+  departmentId?: string;
+  designationId?: string;
   department: string;
   designation: string;
   branch: string;
+  location?: string;
   email: string;
   mobile: string;
   reportingManager: string;
   hod: string;
   status: 'active' | 'inactive';
   avatar?: string;
+  title?: string;
+  firstName?: string;
+  lastName?: string;
+  gender?: string;
+  dob?: string;
+  joinedDate?: string;
+  qualification?: string;
+  bloodGroup?: string;
+  maritalStatus?: string;
+  religion?: string;
+  community?: string;
+  fatherName?: string;
+  pincode?: string;
+  address?: string;
+  jobType?: string;
+  payrollType?: string;
+  attendanceCategory?: string;
+  experience?: string;
+  panNo?: string;
+  mobile2?: string;
+  details?: Record<string, unknown>;
 }
 
 export interface FieldOption {
@@ -50,11 +74,13 @@ export interface FormField {
   width?: 'full' | 'half' | 'third';
   helpText?: string;
   icon?: string;
+  hrmsSource?: 'staff_id' | 'phone' | 'department' | 'designation';
 }
 
 export interface FormSchema {
   id: string;
   title: string;
+  departmentId?: string;
   department: string;
   icon: string;
   description: string;
@@ -135,8 +161,10 @@ export interface Approver {
   role: UserRole;
   department: string;
   email: string;
+  employeeId?: string | null;
   avatar?: string;
   initials: string;
+  preferences?: import('../utils/userPreferences').UserPreferences;
 }
 
 export interface DashboardStats {

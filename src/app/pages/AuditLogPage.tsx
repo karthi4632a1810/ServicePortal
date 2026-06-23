@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
-import { MOCK_AUDIT_LOGS } from '../data/mockData';
+import { useApp } from '../context/AppContext';
 import type { AuditLog } from '../types';
 
 const SEVERITY_CONFIG = {
@@ -79,11 +79,12 @@ function AuditRow({ log }: { log: AuditLog }) {
 }
 
 export function AuditLogPage() {
+  const { auditLogs } = useApp();
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');
 
-  const filtered = MOCK_AUDIT_LOGS.filter(l => {
+  const filtered = auditLogs.filter(l => {
     const q = search.toLowerCase();
     const matchSearch = !q || l.user.toLowerCase().includes(q) || l.action.toLowerCase().includes(q) || l.entityId.toLowerCase().includes(q);
     const matchSeverity = !severityFilter || l.severity === severityFilter;
@@ -92,14 +93,14 @@ export function AuditLogPage() {
   });
 
   const counts = {
-    info: MOCK_AUDIT_LOGS.filter(l => l.severity === 'info').length,
-    success: MOCK_AUDIT_LOGS.filter(l => l.severity === 'success').length,
-    warning: MOCK_AUDIT_LOGS.filter(l => l.severity === 'warning').length,
-    error: MOCK_AUDIT_LOGS.filter(l => l.severity === 'error').length,
+    info: auditLogs.filter(l => l.severity === 'info').length,
+    success: auditLogs.filter(l => l.severity === 'success').length,
+    warning: auditLogs.filter(l => l.severity === 'warning').length,
+    error: auditLogs.filter(l => l.severity === 'error').length,
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 max-w-[1200px]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 w-full">
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -176,7 +177,7 @@ export function AuditLogPage() {
         </div>
 
         <div className="ml-auto text-muted-foreground" style={{ fontSize: '12px' }}>
-          {filtered.length} of {MOCK_AUDIT_LOGS.length} entries
+          {filtered.length} of {auditLogs.length} entries
         </div>
       </div>
 

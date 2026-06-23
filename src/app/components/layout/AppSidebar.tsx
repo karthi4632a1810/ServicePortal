@@ -1,5 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
+import { useNavigate } from 'react-router';
 import {
   LayoutDashboard, User, LayoutGrid, FileText, CheckSquare,
   Layers, Wrench, Shield, Settings, ChevronLeft, ChevronRight,
@@ -7,32 +8,45 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { useApp } from '../../context/AppContext';
+import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
+import { canAccessPage } from '../../utils/roleAccess';
 import type { Page } from '../../types';
 
 interface NavItem {
   id: Page;
   label: string;
   icon: React.ElementType;
-  badge?: number;
   dividerBefore?: boolean;
-  adminOnly?: boolean;
 }
 
 const NAV_ITEMS: NavItem[] = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { id: 'employee-portal', label: 'Employee Portal', icon: User, dividerBefore: true },
-  { id: 'service-catalog', label: 'Service Catalog', icon: LayoutGrid },
+  { id: 'service-catalog', label: 'Form Catalog', icon: LayoutGrid },
   { id: 'my-requests', label: 'My Requests', icon: FileText },
-  { id: 'approvals', label: 'Approvals', icon: CheckSquare, badge: 3 },
-  { id: 'workflow-pipeline', label: 'Workflow Pipeline', icon: GitBranch, badge: 4 },
-  { id: 'work-queue', label: 'Work Queue', icon: Layers, badge: 5 },
-  { id: 'form-builder', label: 'Form Builder', icon: Wrench, dividerBefore: true, adminOnly: true },
-  { id: 'audit-log', label: 'Audit Log', icon: Shield, adminOnly: true },
+  { id: 'approvals', label: 'Approvals', icon: CheckSquare },
+  { id: 'workflow-pipeline', label: 'Workflow Pipeline', icon: GitBranch },
+  { id: 'work-queue', label: 'Work Queue', icon: Layers },
+  { id: 'form-builder', label: 'Form Builder', icon: Wrench, dividerBefore: true },
+  { id: 'audit-log', label: 'Audit Log', icon: Shield },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
+function useNavBadges(requests: import('../../types').Request[]): Partial<Record<Page, number>> {
+  return {
+    approvals: requests.filter(r => r.status === 'pending_approval').length,
+    'workflow-pipeline': requests.filter(r => !['completed', 'rejected', 'cancelled'].includes(r.status)).length,
+    'work-queue': requests.filter(r => ['approved', 'processing'].includes(r.status)).length,
+  };
+}
+
 export function AppSidebar() {
-  const { currentPage, navigate, isSidebarCollapsed, toggleSidebar, currentUser, logout } = useApp();
+  const { currentPage, navigate, isSidebarCollapsed, toggleSidebar, currentUser, logout, requests } = useApp();
+  const routerNavigate = useNavigate();
+  const badges = useNavBadges(requests);
+  const visibleItems = NAV_ITEMS.filter(item =>
+    currentUser ? canAccessPage(currentUser.role, item.id) : false
+  );
 
   return (
     <motion.aside
@@ -40,7 +54,6 @@ export function AppSidebar() {
       transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
       className="bg-sidebar text-sidebar-foreground flex flex-col h-screen sticky top-0 overflow-hidden shrink-0 z-40"
     >
-      {/* Logo */}
       <div className="flex items-center h-14 px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <div className="size-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
@@ -55,8 +68,8 @@ export function AppSidebar() {
                 transition={{ duration: 0.15 }}
                 className="flex flex-col min-w-0"
               >
-                <span className="text-sidebar-foreground font-semibold truncate" style={{ fontSize: '13px', lineHeight: '1.2' }}>ServicePortal</span>
-                <span className="text-sidebar-foreground/50 truncate" style={{ fontSize: '10px', lineHeight: '1.2' }}>Enterprise Edition</span>
+                <span className="text-sidebar-foreground font-semibold truncate" style={{ fontSize: '13px', lineHeight: '1.2' }}>{APP_NAME}</span>
+                <span className="text-sidebar-foreground/50 truncate" style={{ fontSize: '10px', lineHeight: '1.2' }}>{APP_TAGLINE}</span>
               </motion.div>
             )}
           </AnimatePresence>
@@ -70,9 +83,8 @@ export function AppSidebar() {
         </button>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 overflow-y-auto overflow-x-hidden py-3 px-2 space-y-0.5">
-        {NAV_ITEMS.map((item) => {
+        {visibleItems.map((item) => {
           const isActive = currentPage === item.id;
           const Icon = item.icon;
           return (
@@ -113,14 +125,14 @@ export function AppSidebar() {
                       </motion.span>
                     )}
                   </AnimatePresence>
-                  {!isSidebarCollapsed && item.badge && (
+                  {!isSidebarCollapsed && badges[item.id] != null && badges[item.id]! > 0 && (
                     <span className="ml-auto shrink-0 size-5 rounded-full bg-sidebar-primary text-sidebar-primary-foreground flex items-center justify-center"
                       style={{ fontSize: '10px', fontWeight: 600 }}>
-                      {item.badge}
+                      {badges[item.id]}
                     </span>
                   )}
                 </span>
-                {isSidebarCollapsed && item.badge && (
+                {isSidebarCollapsed && badges[item.id] != null && badges[item.id]! > 0 && (
                   <span className="absolute top-1 right-1 size-2 rounded-full bg-sidebar-primary" />
                 )}
               </button>
@@ -129,11 +141,10 @@ export function AppSidebar() {
         })}
       </nav>
 
-      {/* User Section */}
       {currentUser && (
         <div className="border-t border-sidebar-border p-2 shrink-0">
           <div className={cn(
-            'flex items-center rounded-lg transition-colors cursor-pointer hover:bg-sidebar-accent/50',
+            'flex items-center rounded-lg transition-colors',
             isSidebarCollapsed ? 'p-2 justify-center' : 'px-3 py-2 gap-3'
           )}>
             <div className="size-7 rounded-full bg-sidebar-primary flex items-center justify-center shrink-0">
@@ -150,7 +161,7 @@ export function AppSidebar() {
                   className="flex-1 min-w-0"
                 >
                   <p className="text-sidebar-foreground truncate" style={{ fontSize: '12px', fontWeight: 500 }}>{currentUser.name}</p>
-                  <p className="text-sidebar-foreground/50 truncate capitalize" style={{ fontSize: '10px' }}>{currentUser.role.replace('_', ' ')}</p>
+                  <p className="text-sidebar-foreground/50 truncate capitalize" style={{ fontSize: '10px' }}>{currentUser.role.replace(/_/g, ' ')}</p>
                 </motion.div>
               )}
             </AnimatePresence>
@@ -160,7 +171,7 @@ export function AppSidebar() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  onClick={logout}
+                  onClick={() => { logout(); routerNavigate('/'); }}
                   className="text-sidebar-foreground/40 hover:text-sidebar-foreground transition-colors ml-auto"
                   title="Logout"
                 >

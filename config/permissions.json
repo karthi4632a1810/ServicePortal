@@ -1,0 +1,11 @@
+[
+  { "code": "forms.read", "resource": "forms", "action": "read", "roles": ["admin", "hod", "processor", "it_team", "employee"] },
+  { "code": "forms.write", "resource": "forms", "action": "write", "roles": ["admin"] },
+  { "code": "requests.create", "resource": "requests", "action": "create", "roles": ["admin", "employee"] },
+  { "code": "requests.read", "resource": "requests", "action": "read", "roles": ["admin", "hod", "processor", "it_team"] },
+  { "code": "requests.approve", "resource": "requests", "action": "approve", "roles": ["admin", "hod"] },
+  { "code": "requests.process", "resource": "requests", "action": "process", "roles": ["admin", "processor", "it_team"] },
+  { "code": "audit.read", "resource": "audit", "action": "read", "roles": ["admin"] },
+  { "code": "dashboard.read", "resource": "dashboard", "action": "read", "roles": ["admin", "hod", "processor", "it_team"] },
+  { "code": "users.manage", "resource": "users", "action": "manage", "roles": ["admin"] }
+]

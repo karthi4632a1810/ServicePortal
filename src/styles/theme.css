@@ -93,6 +93,39 @@
   --info-foreground: #ffffff;
 }
 
+html.compact {
+  font-size: 14px;
+}
+
+html.compact .p-6 {
+  padding: 1rem !important;
+}
+
+html.compact .gap-6 {
+  gap: 1rem !important;
+}
+
+html.compact .mb-6 {
+  margin-bottom: 1rem !important;
+}
+
+html.compact .space-y-5 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem !important;
+}
+
+html.compact .space-y-6 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1.25rem !important;
+}
+
+html.no-animations *,
+html.no-animations *::before,
+html.no-animations *::after {
+  animation-duration: 0.01ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.01ms !important;
+  scroll-behavior: auto !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

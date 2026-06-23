@@ -1,0 +1,134 @@
+{
+  "id": "form-it-system-request",
+  "title": "System Request Form",
+  "department": "Information Technology",
+  "icon": "FileText",
+  "description": "Submit a system access or equipment request for staff at Om Sakthi Adhiparasakthi Hospitals.",
+  "category": "Forms",
+  "version": 2,
+  "estimatedTime": "1-2 business days",
+  "slaHours": 72,
+  "active": true,
+  "workflowTemplateId": "wf-hod-then-processor",
+  "fields": [
+    {
+      "id": "hrms-staff-id",
+      "type": "text",
+      "label": "Staff ID",
+      "required": true,
+      "placeholder": "e.g. 60464",
+      "width": "half",
+      "hrmsSource": "staff_id",
+      "helpText": "Enter your HRMS staff ID to load your details."
+    },
+    {
+      "id": "hrms-staff-phone",
+      "type": "phone",
+      "label": "Phone",
+      "required": true,
+      "placeholder": "e.g. 9876543210",
+      "width": "half",
+      "hrmsSource": "phone",
+      "helpText": "Registered mobile number must match HRMS records."
+    },
+    {
+      "id": "f1",
+      "type": "section_title",
+      "label": "Employee Information",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f3",
+      "type": "section_title",
+      "label": "System Request Details",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f4",
+      "type": "text",
+      "label": "Name",
+      "required": true,
+      "placeholder": "Full name as per HRMS",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f6",
+      "type": "dropdown",
+      "label": "Department",
+      "hrmsSource": "department",
+      "required": true,
+      "placeholder": "Select department",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f7",
+      "type": "dropdown",
+      "label": "Designation",
+      "hrmsSource": "designation",
+      "required": true,
+      "placeholder": "Select designation",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f8",
+      "type": "date",
+      "label": "Date of Joining",
+      "required": true,
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f10",
+      "type": "phone",
+      "label": "CUG No.",
+      "required": false,
+      "placeholder": "Closed User Group number (if applicable)",
+      "helpText": "Official CUG mobile number, if assigned",
+      "width": "half",
+      "options": []
+    },
+    {
+      "id": "f11",
+      "type": "section_title",
+      "label": "Request Information",
+      "required": false,
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f12",
+      "type": "textarea",
+      "label": "System / Access Requested",
+      "required": true,
+      "placeholder": "Describe the system, module, or equipment you need access to...",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f13",
+      "type": "textarea",
+      "label": "Remarks",
+      "required": false,
+      "placeholder": "Any additional details for IT...",
+      "width": "full",
+      "options": []
+    },
+    {
+      "id": "f14",
+      "type": "file",
+      "label": "Attach Supporting Document",
+      "required": false,
+      "helpText": "Optional: HOD approval or supporting document",
+      "width": "full",
+      "options": []
+    }
+  ],
+  "departmentId": "14"
+}

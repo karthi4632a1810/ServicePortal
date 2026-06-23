@@ -24,9 +24,11 @@ import { DetailPanel } from '../components/workflow/DetailPanel';
 import { stagger, fadeUp, scaleIn } from '../lib/animations';
 
 import {
-  WORKFLOW_REQUESTS, COLUMNS, PRIORITY_CONFIG,
+  COLUMNS, PRIORITY_CONFIG,
   type WFRequest, type WFStatus, type ColumnConfig,
 } from '../data/workflowData';
+import { useApp } from '../context/AppContext';
+import { requestsToWorkflow } from '../utils/mapRequestToWorkflow';
 
 /* ── Icon map ────────────────────────────────────────────────── */
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -391,7 +393,7 @@ function TimelineView({ requests, onSelect }: { requests: WFRequest[]; onSelect:
   });
 
   return (
-    <div className="max-w-[760px] mx-auto py-2 space-y-8">
+    <div className="w-full py-2 space-y-8">
       {Object.entries(grouped).map(([date, reqs]) => (
         <motion.div key={date} initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
           <div className="flex items-center gap-3 mb-4">
@@ -564,26 +566,26 @@ const FILTERS: { id: FilterKey; label: string; dot?: string }[] = [
 
 /* ── Main page ───────────────────────────────────────────────── */
 export function WorkflowPipelinePage() {
+  const { requests, loading: appLoading, currentUser } = useApp();
+  const workflowRequests = useMemo(() => requestsToWorkflow(requests), [requests]);
   const [view, setView] = useState<'pipeline' | 'timeline' | 'analytics'>('pipeline');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [search, setSearch] = useState('');
   const [selectedReq, setSelectedReq] = useState<WFRequest | null>(null);
   const [collapsed, setCollapsed] = useState<Set<WFStatus>>(new Set(['rejected']));
-  const [isLoading, setIsLoading] = useState(true);
   const [showSearch, setShowSearch] = useState(false);
 
-  useEffect(() => {
-    const t = setTimeout(() => setIsLoading(false), 900);
-    return () => clearTimeout(t);
-  }, []);
+  const isLoading = appLoading;
 
   /* apply filters */
   const filtered = useMemo(() => {
-    let reqs = WORKFLOW_REQUESTS;
+    let reqs = workflowRequests;
     if (filter === 'overdue') reqs = reqs.filter(r => r.isOverdue);
     if (filter === 'high_priority') reqs = reqs.filter(r => r.priority === 'high' || r.priority === 'critical');
     if (filter === 'pending') reqs = reqs.filter(r => r.status === 'pending_approval');
-    if (filter === 'my_queue') reqs = reqs.filter(r => r.assignedTo === 'Rajesh Kumar' || r.assignedInitials === 'RK');
+    if (filter === 'my_queue') reqs = reqs.filter(r =>
+      currentUser && (r.assignedTo === currentUser.name || r.assignedInitials === currentUser.initials)
+    );
     if (search) {
       const q = search.toLowerCase();
       reqs = reqs.filter(r =>
@@ -594,7 +596,7 @@ export function WorkflowPipelinePage() {
       );
     }
     return reqs;
-  }, [filter, search]);
+  }, [filter, search, workflowRequests, currentUser]);
 
   const reqsByStatus = (status: WFStatus) => filtered.filter(r => r.status === status);
   const toggleCollapse = (status: WFStatus) => {
@@ -630,7 +632,7 @@ export function WorkflowPipelinePage() {
             </motion.h1>
             <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.1 }}
               className="text-muted-foreground" style={{ fontSize: '12px' }}>
-              {filtered.length} active requests · {WORKFLOW_REQUESTS.filter(r => r.isOverdue).length} SLA breach{WORKFLOW_REQUESTS.filter(r => r.isOverdue).length !== 1 ? 'es' : ''}
+              {filtered.length} active requests · {workflowRequests.filter(r => r.isOverdue).length} SLA breach{workflowRequests.filter(r => r.isOverdue).length !== 1 ? 'es' : ''}
             </motion.p>
           </div>
 

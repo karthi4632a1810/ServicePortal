@@ -13,10 +13,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import {
-  MOCK_DASHBOARD_STATS, CHART_DATA_WEEKLY, CHART_DATA_STATUS,
-  CHART_DATA_DEPARTMENT, MOCK_REQUESTS,
-} from '../data/mockData';
+import type { Request } from '../types';
 
 /* ── Animation imports ───────────────────────────────────────── */
 import { AnimatedCounter } from '../components/animations/AnimatedCounter';
@@ -136,7 +133,7 @@ function PulseDot({ color }: { color: string }) {
 }
 
 /* ── Animated request row ────────────────────────────────────── */
-function RequestRow({ req, i, onClick }: { req: typeof MOCK_REQUESTS[0]; i: number; onClick: () => void }) {
+function RequestRow({ req, i, onClick }: { req: Request; i: number; onClick: () => void }) {
   const cfg = STATUS_CONFIG[req.status];
   return (
     <motion.div
@@ -221,10 +218,9 @@ function TopFormsList() {
 
 /* ── Main dashboard ──────────────────────────────────────────── */
 export function DashboardPage() {
-  const { navigate } = useApp();
-  const requests = MOCK_REQUESTS;
-  const stats = MOCK_DASHBOARD_STATS;
+  const { navigate, requests, dashboardStats: stats, chartData, refreshRequests } = useApp();
   const recent = requests.slice(0, 6);
+  const { weekly: CHART_DATA_WEEKLY, status: CHART_DATA_STATUS, department: CHART_DATA_DEPARTMENT } = chartData;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
 
@@ -233,10 +229,12 @@ export function DashboardPage() {
     return () => clearTimeout(t);
   }, []);
 
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setIsRefreshing(true);
     setShowSkeleton(true);
-    setTimeout(() => { setIsRefreshing(false); setShowSkeleton(false); }, 1200);
+    await refreshRequests();
+    setIsRefreshing(false);
+    setShowSkeleton(false);
   };
 
   if (showSkeleton) return <SkeletonDashboard cards={4} rows={5} />;
@@ -246,7 +244,7 @@ export function DashboardPage() {
       initial="hidden"
       animate="show"
       variants={stagger(0.05)}
-      className="p-6 space-y-6 max-w-[1400px] relative"
+      className="p-6 space-y-6 w-full relative"
     >
       {/* Page header */}
       <motion.div variants={fadeUp} className="flex items-center justify-between">

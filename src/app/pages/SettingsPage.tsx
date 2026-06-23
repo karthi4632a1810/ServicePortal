@@ -1,13 +1,14 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router';
 import {
   Settings, User, Bell, Shield, Mail, Palette, Building2,
   Globe, Key, Save, ChevronRight, Check, Smartphone,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
-import { useApp } from '../context/AppContext';
-import { MOCK_APPROVERS } from '../data/mockData';
+import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
+import { ACCENT_COLORS } from '../utils/userPreferences';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -18,8 +19,17 @@ const SECTIONS = [
   { id: 'integrations', label: 'Integrations', icon: Globe },
 ];
 
-function ToggleSetting({ label, desc, defaultOn = false }: { label: string; desc: string; defaultOn?: boolean }) {
-  const [on, setOn] = useState(defaultOn);
+function ToggleSetting({
+  label,
+  desc,
+  checked,
+  onChange,
+}: {
+  label: string;
+  desc: string;
+  checked: boolean;
+  onChange: (next: boolean) => void;
+}) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-border/50 last:border-0">
       <div>
@@ -27,15 +37,15 @@ function ToggleSetting({ label, desc, defaultOn = false }: { label: string; desc
         <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{desc}</p>
       </div>
       <button
-        onClick={() => setOn(!on)}
+        onClick={() => onChange(!checked)}
         className={cn(
           'relative w-10 h-5.5 rounded-full transition-colors',
-          on ? 'bg-primary' : 'bg-muted-foreground/30'
+          checked ? 'bg-primary' : 'bg-muted-foreground/30'
         )}
         style={{ width: 40, height: 22 }}
       >
         <motion.div
-          animate={{ x: on ? 20 : 2 }}
+          animate={{ x: checked ? 20 : 2 }}
           transition={{ type: 'spring', stiffness: 400, damping: 30 }}
           className="absolute top-1 size-4 rounded-full bg-white shadow-sm"
         />
@@ -45,11 +55,16 @@ function ToggleSetting({ label, desc, defaultOn = false }: { label: string; desc
 }
 
 export function SettingsPage() {
-  const { currentUser, isDark, toggleDark } = useApp();
+  const { currentUser, preferences, setTheme, updatePreferences, isAuthenticated, login, logout, apiLoginUsers } = useApp();
+  const routerNavigate = useNavigate();
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
+  const [loginEmail, setLoginEmail] = useState(DEMO_LOGIN_USERS[0].email);
+  const [loginPassword, setLoginPassword] = useState('Password@123');
+  const [loginError, setLoginError] = useState('');
+  const [loggingIn, setLoggingIn] = useState(false);
 
-  const user = currentUser ?? MOCK_APPROVERS[0];
+  const user = currentUser ?? apiLoginUsers[0];
 
   const handleSave = () => {
     setSaved(true);
@@ -57,7 +72,7 @@ export function SettingsPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 max-w-[1000px]">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 w-full">
       <div className="mb-6">
         <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Settings</h1>
         <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Manage your account and system preferences</p>
@@ -158,17 +173,17 @@ export function SettingsPage() {
                 <CardContent>
                   <div className="mb-4">
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Notifications</p>
-                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" defaultOn={true} />
-                    <ToggleSetting label="Approval Required" desc="When your approval is needed on a request" defaultOn={true} />
-                    <ToggleSetting label="Request Approved" desc="When your request gets approved" defaultOn={true} />
-                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" defaultOn={true} />
-                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" defaultOn={false} />
-                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" defaultOn={true} />
+                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Approval Required" desc="When your approval is needed on a request" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Request Approved" desc="When your request gets approved" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" checked={false} onChange={() => {}} />
+                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" checked={true} onChange={() => {}} />
                   </div>
                   <div>
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>In-App Notifications</p>
-                    <ToggleSetting label="Real-time Updates" desc="Instant notifications for all activity" defaultOn={true} />
-                    <ToggleSetting label="Daily Digest" desc="Daily summary email of pending items" defaultOn={false} />
+                    <ToggleSetting label="Real-time Updates" desc="Instant notifications for all activity" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Daily Digest" desc="Daily summary email of pending items" checked={false} onChange={() => {}} />
                   </div>
                 </CardContent>
               </Card>
@@ -177,6 +192,77 @@ export function SettingsPage() {
 
           {activeSection === 'security' && (
             <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} className="space-y-5">
+              <Card className="border-border/60 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Account Login</CardTitle>
+                  <CardDescription>Sign in to access dashboard, approvals, and admin features</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {isAuthenticated ? (
+                    <div className="flex items-center justify-between p-4 rounded-lg bg-emerald-50 dark:bg-emerald-950 border border-emerald-200 dark:border-emerald-800">
+                      <div>
+                        <p className="text-foreground" style={{ fontSize: '13px', fontWeight: 500 }}>Signed in as {currentUser?.name}</p>
+                        <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{currentUser?.email}</p>
+                      </div>
+                      <button
+                        onClick={() => { logout(); routerNavigate('/'); }}
+                        className="px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
+                        style={{ fontSize: '12px' }}
+                      >
+                        Sign Out
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <div>
+                        <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>ACCOUNT</label>
+                        <select
+                          value={loginEmail}
+                          onChange={e => setLoginEmail(e.target.value)}
+                          className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                          style={{ fontSize: '13px' }}
+                        >
+                          {apiLoginUsers.map(u => (
+                            <option key={u.email} value={u.email}>{u.name} ({u.role})</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>PASSWORD</label>
+                        <input
+                          type="password"
+                          value={loginPassword}
+                          onChange={e => setLoginPassword(e.target.value)}
+                          className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                          style={{ fontSize: '13px' }}
+                        />
+                      </div>
+                      {loginError && (
+                        <p className="text-destructive" style={{ fontSize: '12px' }}>{loginError}</p>
+                      )}
+                      <button
+                        disabled={loggingIn}
+                        onClick={async () => {
+                          setLoggingIn(true);
+                          setLoginError('');
+                          try {
+                            await login(loginEmail, loginPassword);
+                          } catch (err) {
+                            setLoginError(err instanceof Error ? err.message : 'Login failed');
+                          } finally {
+                            setLoggingIn(false);
+                          }
+                        }}
+                        className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50"
+                        style={{ fontSize: '13px', fontWeight: 500 }}
+                      >
+                        {loggingIn ? 'Signing in...' : 'Sign In'}
+                      </button>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card className="border-border/60 shadow-sm">
                 <CardHeader>
                   <CardTitle>Change Password</CardTitle>
@@ -238,14 +324,14 @@ export function SettingsPage() {
                       ].map(({ id, label, preview }) => (
                         <button
                           key={id}
-                          onClick={() => { if ((id === 'dark') !== isDark) toggleDark(); }}
+                          onClick={() => void setTheme(id as 'light' | 'dark' | 'system')}
                           className={cn(
                             'flex flex-col items-center gap-2',
                           )}
                         >
                           <div className={cn(
                             'w-20 h-14 rounded-lg', preview,
-                            ((id === 'dark' && isDark) || (id === 'light' && !isDark))
+                            preferences.theme === id
                               ? 'border-primary shadow-md' : 'border-border'
                           )} />
                           <span className="text-foreground" style={{ fontSize: '12px' }}>{label}</span>
@@ -257,21 +343,33 @@ export function SettingsPage() {
                   <div>
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
                     <div className="flex gap-3">
-                      {[
-                        { color: '#2563EB', label: 'Blue' },
-                        { color: '#7C3AED', label: 'Purple' },
-                        { color: '#059669', label: 'Emerald' },
-                        { color: '#DC2626', label: 'Red' },
-                        { color: '#D97706', label: 'Amber' },
-                      ].map(({ color, label }) => (
-                        <button key={color} title={label} className="size-8 rounded-full border-2 border-white shadow-sm hover:scale-110 transition-transform"
-                          style={{ background: color }} />
+                      {ACCENT_COLORS.map(({ color, label }) => (
+                        <button
+                          key={color}
+                          title={label}
+                          onClick={() => void updatePreferences({ accentColor: color })}
+                          className={cn(
+                            'size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform',
+                            preferences.accentColor === color ? 'border-foreground scale-110' : 'border-white',
+                          )}
+                          style={{ background: color }}
+                        />
                       ))}
                     </div>
                   </div>
 
-                  <ToggleSetting label="Compact Mode" desc="Reduce spacing for more content on screen" />
-                  <ToggleSetting label="Animations" desc="Enable motion animations and transitions" defaultOn={true} />
+                  <ToggleSetting
+                    label="Compact Mode"
+                    desc="Reduce spacing for more content on screen"
+                    checked={preferences.compactMode}
+                    onChange={(compactMode) => void updatePreferences({ compactMode })}
+                  />
+                  <ToggleSetting
+                    label="Animations"
+                    desc="Enable motion animations and transitions"
+                    checked={preferences.animations}
+                    onChange={(animations) => void updatePreferences({ animations })}
+                  />
                 </CardContent>
               </Card>
             </motion.div>
