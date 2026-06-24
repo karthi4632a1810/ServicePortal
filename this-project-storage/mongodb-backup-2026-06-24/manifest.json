@@ -1,0 +1,19 @@
+{
+  "database": "service_portal",
+  "createdAt": "2026-06-24T11:36:35.564Z",
+  "backupDir": "this-project-storage/mongodb-backup-2026-06-24/service_portal",
+  "archive": "mongodb-service_portal-2026-06-24.archive.gz",
+  "collections": [
+    "approvallogs",
+    "auditlogs",
+    "departments",
+    "forms",
+    "formversions",
+    "notifications",
+    "permissions",
+    "requests",
+    "roles",
+    "users",
+    "workflowtemplates"
+  ]
+}
