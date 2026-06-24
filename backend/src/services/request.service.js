@@ -9,6 +9,7 @@ import workflowEngine from './workflowEngine.service.js';
 import hrmsService from './hrms.service.js';
 import formService from './form.service.js';
 import notificationService from './notification.service.js';
+import { mergeRequestScope, canAccessRequest } from '../utils/requestScope.js';
 
 function mapRequestToFrontend(doc) {
   const r = doc.toObject ? doc.toObject() : doc;
@@ -92,13 +93,14 @@ export class RequestService {
     return mapRequestToFrontend(request);
   }
 
-  async getRequestsByEmployee(employeeId) {
-    const requests = await Request.find({ 'employee.id': employeeId.toUpperCase() })
-      .sort('-submittedAt');
+  async getRequestsByEmployee(employeeId, user = null) {
+    const query = { 'employee.id': employeeId.toUpperCase() };
+    const scopedQuery = mergeRequestScope(query, user);
+    const requests = await Request.find(scopedQuery).sort('-submittedAt');
     return requests.map(mapRequestToFrontend);
   }
 
-  async listRequests(filters = {}, options = {}) {
+  async listRequests(filters = {}, options = {}, user = null) {
     const query = {};
     if (filters.status) query.status = filters.status;
     if (filters.department) query.department = new RegExp(filters.department, 'i');
@@ -113,7 +115,8 @@ export class RequestService {
       ];
     }
 
-    const { items, pagination } = await paginatedFind(Request, query, options);
+    const scopedQuery = mergeRequestScope(query, user);
+    const { items, pagination } = await paginatedFind(Request, scopedQuery, options);
     return { requests: items.map(mapRequestToFrontend), pagination };
   }
 

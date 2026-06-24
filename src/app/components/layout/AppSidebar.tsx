@@ -4,9 +4,10 @@ import { useNavigate } from 'react-router';
 import {
   LayoutDashboard, User, LayoutGrid, FileText, CheckSquare,
   Layers, Wrench, Shield, Settings, ChevronLeft, ChevronRight,
-  ClipboardList, LogOut, GitBranch,
+  ClipboardList, LogOut, GitBranch, Users,
 } from 'lucide-react';
 import { cn } from '../ui/utils';
+import { UserAvatar } from '../ui/user-avatar';
 import { useApp } from '../../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 import { canAccessPage } from '../../utils/roleAccess';
@@ -28,6 +29,7 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'workflow-pipeline', label: 'Workflow Pipeline', icon: GitBranch },
   { id: 'work-queue', label: 'Work Queue', icon: Layers },
   { id: 'form-builder', label: 'Form Builder', icon: Wrench, dividerBefore: true },
+  { id: 'user-management', label: 'User Management', icon: Users },
   { id: 'audit-log', label: 'Audit Log', icon: Shield },
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
@@ -147,11 +149,14 @@ export function AppSidebar() {
             'flex items-center rounded-lg transition-colors',
             isSidebarCollapsed ? 'p-2 justify-center' : 'px-3 py-2 gap-3'
           )}>
-            <div className="size-7 rounded-full bg-sidebar-primary flex items-center justify-center shrink-0">
-              <span className="text-sidebar-primary-foreground font-semibold" style={{ fontSize: '10px' }}>
-                {currentUser.initials}
-              </span>
-            </div>
+            <UserAvatar
+              name={currentUser.name}
+              initials={currentUser.initials}
+              employeeId={currentUser.employeeId}
+              avatar={currentUser.avatar}
+              className="size-7"
+              fallbackClassName="bg-sidebar-primary text-sidebar-primary-foreground"
+            />
             <AnimatePresence>
               {!isSidebarCollapsed && (
                 <motion.div
@@ -161,7 +166,9 @@ export function AppSidebar() {
                   className="flex-1 min-w-0"
                 >
                   <p className="text-sidebar-foreground truncate" style={{ fontSize: '12px', fontWeight: 500 }}>{currentUser.name}</p>
-                  <p className="text-sidebar-foreground/50 truncate capitalize" style={{ fontSize: '10px' }}>{currentUser.role.replace(/_/g, ' ')}</p>
+                  <p className="text-sidebar-foreground/50 truncate capitalize" style={{ fontSize: '10px' }}>
+                    {currentUser.designation || currentUser.role.replace(/_/g, ' ')}
+                  </p>
                 </motion.div>
               )}
             </AnimatePresence>

@@ -1,10 +1,12 @@
 import Request from '../models/Request.js';
 import AuditLog from '../models/AuditLog.js';
+import { mergeRequestScope } from '../utils/requestScope.js';
 
 export class DashboardService {
-  async getStats() {
+  async getStats(user = null) {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+    const scope = (extra = {}) => mergeRequestScope(extra, user);
 
     const [
       totalToday,
@@ -16,15 +18,15 @@ export class DashboardService {
       slaBreached,
       avgResult,
     ] = await Promise.all([
-      Request.countDocuments({ submittedAt: { $gte: today } }),
-      Request.countDocuments({ status: 'pending_approval' }),
-      Request.countDocuments({ status: 'approved' }),
-      Request.countDocuments({ status: 'rejected' }),
-      Request.countDocuments({ status: 'completed' }),
-      Request.countDocuments({ status: 'processing' }),
-      Request.countDocuments({ slaBreached: true }),
+      Request.countDocuments(scope({ submittedAt: { $gte: today } })),
+      Request.countDocuments(scope({ status: 'pending_approval' })),
+      Request.countDocuments(scope({ status: 'approved' })),
+      Request.countDocuments(scope({ status: 'rejected' })),
+      Request.countDocuments(scope({ status: 'completed' })),
+      Request.countDocuments(scope({ status: 'processing' })),
+      Request.countDocuments(scope({ slaBreached: true })),
       Request.aggregate([
-        { $match: { status: 'completed', completedAt: { $exists: true } } },
+        { $match: scope({ status: 'completed', completedAt: { $exists: true } }) },
         {
           $project: {
             hours: {
@@ -48,9 +50,10 @@ export class DashboardService {
     };
   }
 
-  async getWeeklyChart() {
+  async getWeeklyChart(user = null) {
     const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
     const result = [];
+    const scope = (extra = {}) => mergeRequestScope(extra, user);
 
     for (let i = 6; i >= 0; i--) {
       const date = new Date();
@@ -60,10 +63,10 @@ export class DashboardService {
       nextDate.setDate(nextDate.getDate() + 1);
 
       const [submitted, approved, rejected, completed] = await Promise.all([
-        Request.countDocuments({ submittedAt: { $gte: date, $lt: nextDate } }),
-        Request.countDocuments({ updatedAt: { $gte: date, $lt: nextDate }, status: 'approved' }),
-        Request.countDocuments({ updatedAt: { $gte: date, $lt: nextDate }, status: 'rejected' }),
-        Request.countDocuments({ completedAt: { $gte: date, $lt: nextDate } }),
+        Request.countDocuments(scope({ submittedAt: { $gte: date, $lt: nextDate } })),
+        Request.countDocuments(scope({ updatedAt: { $gte: date, $lt: nextDate }, status: 'approved' })),
+        Request.countDocuments(scope({ updatedAt: { $gte: date, $lt: nextDate }, status: 'rejected' })),
+        Request.countDocuments(scope({ completedAt: { $gte: date, $lt: nextDate } })),
       ]);
 
       result.push({ day: days[date.getDay()], submitted, approved, rejected, completed });
@@ -72,15 +75,16 @@ export class DashboardService {
     return result;
   }
 
-  async getStatusChart() {
+  async getStatusChart(user = null) {
     const statuses = ['completed', 'pending_approval', 'processing', 'rejected'];
     const colors = { completed: '#10b981', pending_approval: '#f59e0b', processing: '#3b82f6', rejected: '#ef4444' };
     const labels = { completed: 'Completed', pending_approval: 'Pending', processing: 'Processing', rejected: 'Rejected' };
+    const scope = (status) => mergeRequestScope({ status }, user);
 
     const data = await Promise.all(
       statuses.map(async (status) => ({
         name: labels[status],
-        value: await Request.countDocuments({ status }),
+        value: await Request.countDocuments(scope(status)),
         color: colors[status],
       }))
     );
@@ -88,18 +92,21 @@ export class DashboardService {
     return data.filter((d) => d.value > 0);
   }
 
-  async getDepartmentChart() {
-    const data = await Request.aggregate([
+  async getDepartmentChart(user = null) {
+    const match = mergeRequestScope({}, user);
+    const pipeline = [
+      ...(Object.keys(match).length ? [{ $match: match }] : []),
       { $group: { _id: '$category', requests: { $sum: 1 } } },
       { $sort: { requests: -1 } },
       { $limit: 10 },
       { $project: { dept: '$_id', requests: 1, _id: 0 } },
-    ]);
-    return data;
+    ];
+    return Request.aggregate(pipeline);
   }
 
-  async getRecentRequests(limit = 5) {
-    const requests = await Request.find().sort('-submittedAt').limit(limit);
+  async getRecentRequests(limit = 5, user = null) {
+    const match = mergeRequestScope({}, user);
+    const requests = await Request.find(match).sort('-submittedAt').limit(limit);
     return requests.map((r) => ({
       id: r._id.toString(),
       requestNumber: r.requestNumber,
@@ -115,7 +122,7 @@ export class DashboardService {
 }
 
 export class SearchService {
-  async search({ q, employeeId, employeeName, department, requestNumber, status, formId, dateFrom, dateTo, page = 1, limit = 20 }) {
+  async search({ q, employeeId, employeeName, department, requestNumber, status, formId, dateFrom, dateTo, page = 1, limit = 20 }, user = null) {
     const filter = {};
 
     if (q) {
@@ -139,10 +146,11 @@ export class SearchService {
       if (dateTo) filter.submittedAt.$lte = new Date(dateTo);
     }
 
+    const scopedFilter = mergeRequestScope(filter, user);
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([
-      Request.find(filter).sort('-submittedAt').skip(skip).limit(limit),
-      Request.countDocuments(filter),
+      Request.find(scopedFilter).sort('-submittedAt').skip(skip).limit(limit),
+      Request.countDocuments(scopedFilter),
     ]);
 
     return {

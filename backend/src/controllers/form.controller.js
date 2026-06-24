@@ -61,7 +61,7 @@ export const formBuilderController = {
       const formId = req.body.formId || req.params.id;
       const { title, departmentId, department, description, icon, fields, workflowTemplateId, estimatedTime, slaHours, basedOnVersion } = req.body;
       if (!title || !departmentId || !department || !fields?.length) {
-        throw new AppError('Title, HRMS department, and fields are required', 400);
+        throw new AppError('Title, department, and fields are required', 400);
       }
       const result = await formService.saveForm({
         formId, title, departmentId, department, description, icon, fields,

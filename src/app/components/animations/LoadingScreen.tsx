@@ -12,7 +12,7 @@ interface LoadingScreenProps {
 const LOADING_STEPS = [
   'Initializing PaperZero...',
   'Loading forms...',
-  'Connecting to HRMS...',
+  'Loading employee details...',
   'Ready!',
 ];
 

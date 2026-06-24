@@ -5,7 +5,7 @@ import { authenticate, optionalAuth } from '../middleware/auth.js';
 const router = Router();
 
 router.get('/', authenticate, requestController.list);
-router.get('/employee/:employeeId', requestController.getByEmployee);
+router.get('/employee/:employeeId', authenticate, requestController.getByEmployee);
 router.get('/:id', optionalAuth, requestController.getById);
 router.post('/', requestController.create);
 router.post('/:id/comments', authenticate, requestController.addComment);

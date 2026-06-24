@@ -18,7 +18,8 @@ export type Page =
   | 'work-queue'
   | 'form-builder'
   | 'audit-log'
-  | 'settings';
+  | 'settings'
+  | 'user-management';
 
 export interface Employee {
   id: string;
@@ -160,10 +161,12 @@ export interface Approver {
   name: string;
   role: UserRole;
   department: string;
+  designation?: string | null;
   email: string;
   employeeId?: string | null;
   avatar?: string;
   initials: string;
+  active?: boolean;
   preferences?: import('../utils/userPreferences').UserPreferences;
 }
 

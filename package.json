@@ -15,6 +15,8 @@
     "start:backend": "node scripts/kill-port.mjs 5000 && pnpm --filter service-portal-backend start",
     "seed": "pnpm --filter service-portal-backend seed",
     "seed:users": "pnpm --filter service-portal-backend seed:users",
+    "seed:superadmin": "pnpm --filter service-portal-backend seed:superadmin",
+    "clear:requests": "pnpm --filter service-portal-backend clear:requests",
     "sync:forms": "pnpm --filter service-portal-backend sync:forms"
   },
   "dependencies": {

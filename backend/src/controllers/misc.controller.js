@@ -29,7 +29,7 @@ export const workflowController = {
 export const dashboardController = {
   stats: async (req, res, next) => {
     try {
-      const stats = await dashboardService.getStats();
+      const stats = await dashboardService.getStats(req.user);
       return successResponse(res, { message: 'Dashboard stats retrieved', data: stats });
     } catch (err) {
       next(err);
@@ -38,7 +38,7 @@ export const dashboardController = {
 
   weeklyChart: async (req, res, next) => {
     try {
-      const data = await dashboardService.getWeeklyChart();
+      const data = await dashboardService.getWeeklyChart(req.user);
       return successResponse(res, { message: 'Weekly chart data retrieved', data });
     } catch (err) {
       next(err);
@@ -47,7 +47,7 @@ export const dashboardController = {
 
   statusChart: async (req, res, next) => {
     try {
-      const data = await dashboardService.getStatusChart();
+      const data = await dashboardService.getStatusChart(req.user);
       return successResponse(res, { message: 'Status chart data retrieved', data });
     } catch (err) {
       next(err);
@@ -56,7 +56,7 @@ export const dashboardController = {
 
   departmentChart: async (req, res, next) => {
     try {
-      const data = await dashboardService.getDepartmentChart();
+      const data = await dashboardService.getDepartmentChart(req.user);
       return successResponse(res, { message: 'Department chart data retrieved', data });
     } catch (err) {
       next(err);
@@ -65,7 +65,7 @@ export const dashboardController = {
 
   recentRequests: async (req, res, next) => {
     try {
-      const data = await dashboardService.getRecentRequests(parseInt(req.query.limit, 10) || 5);
+      const data = await dashboardService.getRecentRequests(parseInt(req.query.limit, 10) || 5, req.user);
       return successResponse(res, { message: 'Recent requests retrieved', data });
     } catch (err) {
       next(err);
@@ -76,7 +76,7 @@ export const dashboardController = {
 export const searchController = {
   search: async (req, res, next) => {
     try {
-      const result = await searchService.search(req.query);
+      const result = await searchService.search(req.query, req.user);
       return successResponse(res, {
         message: 'Search completed',
         data: result.results,

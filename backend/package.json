@@ -11,6 +11,8 @@
     "dev": "node ../scripts/kill-port.mjs 5000 && node --watch src/index.js",
     "seed": "node src/seeds/seed.js",
     "seed:users": "node src/seeds/syncUsers.js",
+    "seed:superadmin": "node src/seeds/superadmin.js",
+    "clear:requests": "node src/seeds/clearRequests.js",
     "sync:forms": "node src/seeds/syncForms.js",
     "test:hrms": "node scripts/test-hrms-db.mjs"
   },

@@ -15,6 +15,7 @@ const userSchema = new mongoose.Schema(
     initials: String,
     avatar: String,
     active: { type: Boolean, default: true },
+    portalPasswordChangedAt: { type: Date, default: null },
     notificationPreferences: {
       emailApproval: { type: Boolean, default: true },
       emailCompleted: { type: Boolean, default: true },

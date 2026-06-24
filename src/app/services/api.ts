@@ -46,10 +46,10 @@ class ApiClient {
   }
 
   // Auth
-  login(email: string, password: string) {
+  login(emailOrStaffId: string, password: string) {
     return this.request<{ token: string; user: import('../types').Approver }>('/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ identifier: emailOrStaffId.trim(), password }),
     });
   }
 
@@ -66,6 +66,66 @@ class ApiClient {
 
   logout() {
     return this.request<null>('/auth/logout', { method: 'POST' });
+  }
+
+  employeeLogin(staffId: string, password: string) {
+    return this.request<{ token: string; user: import('../types').Approver }>('/auth/employee-login', {
+      method: 'POST',
+      body: JSON.stringify({ staffId, password }),
+    });
+  }
+
+  changePassword(oldPassword: string, newPassword: string, confirmPassword: string) {
+    return this.request<null>('/auth/me/change-password', {
+      method: 'POST',
+      body: JSON.stringify({ oldPassword, newPassword, confirmPassword }),
+    });
+  }
+
+  getUsers() {
+    return this.request<import('../types').Approver[]>('/auth/users');
+  }
+
+  updateUser(id: string, data: Partial<Pick<import('../types').Approver, 'name' | 'department' | 'role' | 'active'>>) {
+    return this.request<import('../types').Approver>(`/auth/users/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  }
+
+  resetUserPassword(id: string, newPassword: string, confirmPassword: string) {
+    return this.request<import('../types').Approver>(`/auth/users/${id}/reset-password`, {
+      method: 'POST',
+      body: JSON.stringify({ newPassword, confirmPassword }),
+    });
+  }
+
+  createUser(staffId: string, role: import('../types').UserRole = 'employee') {
+    return this.request<import('../types').Approver>('/auth/users', {
+      method: 'POST',
+      body: JSON.stringify({ staffId, role }),
+    });
+  }
+
+  bulkUpdateUserRole(userIds: string[], role: import('../types').UserRole) {
+    return this.request<import('../types').Approver[]>('/auth/users/bulk/role', {
+      method: 'POST',
+      body: JSON.stringify({ userIds, role }),
+    });
+  }
+
+  bulkResetUserPassword(userIds: string[], newPassword = 'mapims', confirmPassword = 'mapims') {
+    return this.request<import('../types').Approver[]>('/auth/users/bulk/reset-password', {
+      method: 'POST',
+      body: JSON.stringify({ userIds, newPassword, confirmPassword }),
+    });
+  }
+
+  importUsers(users: Array<{ staffId?: string; staff_id?: string; employeeId?: string; role?: import('../types').UserRole }>) {
+    return this.request<{ created: number; updated: number; failed: Array<{ staffId: string; error: string }> }>(
+      '/auth/users/import',
+      { method: 'POST', body: JSON.stringify({ users }) },
+    );
   }
 
   // HRMS

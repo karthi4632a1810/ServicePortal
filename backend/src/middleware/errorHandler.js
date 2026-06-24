@@ -7,7 +7,7 @@ export function notFound(req, res) {
 export function errorHandler(err, req, res, _next) {
   console.error(err);
 
-  if (err.isOperational || err instanceof AppError) {
+  if (err.isOperational || err instanceof AppError || err.statusCode) {
     return errorResponse(res, { message: err.message, statusCode: err.statusCode || 400 });
   }
 

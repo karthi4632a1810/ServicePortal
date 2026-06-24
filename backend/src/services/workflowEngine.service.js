@@ -1,6 +1,11 @@
 import { v4 as uuidv4 } from 'uuid';
 import WorkflowTemplate from '../models/WorkflowTemplate.js';
-import { isSuperAdmin } from '../utils/roles.js';
+import { isSuperAdmin, isHod } from '../utils/roles.js';
+import { departmentsMatch } from '../utils/requestScope.js';
+
+function namesMatch(a, b) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
 
 export class WorkflowEngine {
   async buildWorkflow(templateId, employee) {
@@ -57,19 +62,22 @@ export class WorkflowEngine {
 
   canUserActOnStep(user, step, request) {
     if (!step || step.status !== 'pending') return false;
+    if (isSuperAdmin(user.role)) return true;
 
     switch (step.type) {
       case 'hod':
+        return namesMatch(user.name, step.assignee)
+          || (isHod(user.role) && departmentsMatch(user.department, request?.employee?.department));
       case 'reporting_manager':
       case 'specific_user':
-        return user.name === step.assignee || isSuperAdmin(user.role);
+        return namesMatch(user.name, step.assignee);
       case 'specific_role':
       case 'department_processor':
-        return user.role === step.role || isSuperAdmin(user.role) || user.role === 'processor';
+        return user.role === step.role || user.role === 'processor';
       case 'parallel':
-        return user.role === step.role || isSuperAdmin(user.role);
+        return user.role === step.role;
       default:
-        return isSuperAdmin(user.role);
+        return false;
     }
   }
 

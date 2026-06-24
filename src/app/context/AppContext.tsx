@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { Page, Approver, Request, FormSchema, AuditLog, DashboardStats, Employee } from '../types';
 
 import { api } from '../services/api';
-import { getDefaultPage, DEMO_ACCOUNTS } from '../utils/roleAccess';
+import { getDefaultPage, DEMO_ACCOUNTS, hasAdminAccess, isEmployeeSession as isEmployeeRole } from '../utils/roleAccess';
 import {
   DEFAULT_PREFERENCES,
   applyUserPreferences,
@@ -56,7 +56,15 @@ interface AppContextValue {
 
   isAuthenticated: boolean;
 
-  login: (email: string, password: string) => Promise<void>;
+  isEmployeeSession: boolean;
+
+  hasAdminAccess: boolean;
+
+  login: (identifier: string, password: string) => Promise<void>;
+
+  employeeLogin: (staffId: string, password: string) => Promise<import('../types').Approver>;
+
+  changePassword: (oldPassword: string, newPassword: string, confirmPassword: string) => Promise<void>;
 
   logout: () => void;
 
@@ -111,6 +119,8 @@ interface AppContextValue {
   error: string | null;
 
   refreshRequests: () => Promise<void>;
+
+  refreshApprovals: (status?: string) => Promise<Request[]>;
 
   refreshForms: () => Promise<void>;
 
@@ -202,6 +212,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
 
+  const refreshApprovals = useCallback(async (status = 'pending') => {
+    const res = await api.getApprovals(status);
+    return res.data;
+  }, []);
+
   const loadDashboard = useCallback(async () => {
 
     const [stats, weekly, status, dept] = await Promise.all([
@@ -286,11 +301,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
     updateRequest(res.data);
 
-    await loadDashboard();
+    await Promise.allSettled([refreshRequests(), loadDashboard()]);
 
     return res.data;
 
-  }, [updateRequest, loadDashboard]);
+  }, [updateRequest, loadDashboard, refreshRequests]);
 
 
 
@@ -390,8 +405,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     await updatePreferences({ theme });
   }, [updatePreferences]);
 
-  const login = useCallback(async (email: string, password: string) => {
-    const res = await api.login(email, password);
+  const login = useCallback(async (identifier: string, password: string) => {
+    const res = await api.login(identifier, password);
     api.setToken(res.data.token);
     const user = res.data.user;
     setCurrentUser(user);
@@ -407,6 +422,29 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       await Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
     }
   }, [refreshRequests, loadDashboard, loadAuditLogs, refreshForms, applyPreferences]);
+
+  const employeeLogin = useCallback(async (staffId: string, password: string) => {
+    const res = await api.employeeLogin(staffId, password);
+    api.setToken(res.data.token);
+    const user = res.data.user;
+    setCurrentUser(user);
+    setIsAuthenticated(true);
+    setCurrentPage(getDefaultPage(user.role));
+    applyPreferences(user.preferences ?? DEFAULT_PREFERENCES);
+
+    await refreshForms();
+    if (user.role === 'employee' && user.employeeId) {
+      const empReqs = await api.getEmployeeRequests(user.employeeId);
+      setRequests(empReqs.data);
+    } else if (hasAdminAccess(user.role) || user.role !== 'employee') {
+      await Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
+    }
+    return user;
+  }, [applyPreferences, refreshForms, refreshRequests, loadDashboard, loadAuditLogs]);
+
+  const changePassword = useCallback(async (oldPassword: string, newPassword: string, confirmPassword: string) => {
+    await api.changePassword(oldPassword, newPassword, confirmPassword);
+  }, []);
 
 
 
@@ -483,7 +521,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       isAuthenticated,
 
+      isEmployeeSession: isAuthenticated && isEmployeeRole(currentUser?.role),
+
+      hasAdminAccess: isAuthenticated && hasAdminAccess(currentUser?.role),
+
       login,
+
+      employeeLogin,
+
+      changePassword,
 
       logout,
 
@@ -530,6 +576,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       error,
 
       refreshRequests,
+
+      refreshApprovals,
 
       refreshForms,
 

@@ -22,6 +22,7 @@ import { WorkQueuePage } from './pages/WorkQueuePage';
 import { FormBuilderPage } from './pages/FormBuilderPage';
 import { AuditLogPage } from './pages/AuditLogPage';
 import { SettingsPage } from './pages/SettingsPage';
+import { UserManagementPage } from './pages/UserManagementPage';
 
 const PAGE_VARIANTS = {
   initial: { opacity: 0, y: 16, filter: 'blur(3px)' },
@@ -57,6 +58,7 @@ function PageRouter() {
       case 'work-queue':           return <WorkQueuePage />;
       case 'form-builder':    return <FormBuilderPage />;
       case 'audit-log':       return <AuditLogPage />;
+      case 'user-management': return <UserManagementPage />;
       case 'settings':        return <SettingsPage />;
       default:                return <DashboardPage />;
     }

@@ -40,6 +40,7 @@ export default {
     from: process.env.SMTP_FROM || 'noreply@company.com',
   },
   uploadMaxSize: parseInt(process.env.UPLOAD_MAX_SIZE || '10485760', 10),
+  defaultEmployeePassword: process.env.DEFAULT_EMPLOYEE_PASSWORD || 'mapims',
   paths: {
     root: rootDir,
     config: path.join(rootDir, 'config'),

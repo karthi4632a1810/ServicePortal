@@ -1,38 +1,30 @@
-import bcrypt from 'bcryptjs';
 import User from '../models/User.js';
-import { getInitials } from '../utils/helpers.js';
+import {
+  SUPER_ADMIN_EMAIL,
+  SUPER_ADMIN_STAFF_ID,
+  syncSuperAdmin,
+} from './superadmin.js';
 
-const DEFAULT_PASSWORD = 'Password@123';
+const LEGACY_ADMIN_EMAILS = ['karthikeyan@company.com', 'karthi@mapims.edu.in'];
 
-export const DEMO_USERS = [
-  {
-    name: 'Karthikeyan',
-    email: 'karthikeyan@company.com',
-    role: 'super_admin',
-    department: 'Information Technology',
-    employeeId: '60464',
-  },
-];
+/** Remove legacy accounts — keep super admin and real staff portal users (@portal.local). */
+export async function pruneMockUsers() {
+  await User.deleteMany({ email: { $in: LEGACY_ADMIN_EMAILS } });
+
+  const result = await User.deleteMany({
+    $and: [
+      { email: { $not: /@portal\.local$/i } },
+      { email: { $ne: SUPER_ADMIN_EMAIL.toLowerCase() } },
+      { employeeId: { $ne: SUPER_ADMIN_STAFF_ID } },
+    ],
+  });
+  return result.deletedCount ?? 0;
+}
 
 export async function syncDemoUsers() {
-  const hashedPassword = await bcrypt.hash(DEFAULT_PASSWORD, 10);
-
-  for (const u of DEMO_USERS) {
-    await User.findOneAndUpdate(
-      { email: u.email.toLowerCase() },
-      {
-        ...u,
-        email: u.email.toLowerCase(),
-        password: hashedPassword,
-        initials: getInitials(u.name),
-        avatar: getInitials(u.name),
-        active: true,
-      },
-      { upsert: true, new: true },
-    );
-  }
-
-  console.log(`Synced ${DEMO_USERS.length} admin user(s)`);
+  const removed = await pruneMockUsers();
+  await syncSuperAdmin({ updatePassword: false });
+  if (removed > 0) console.log(`Removed ${removed} other user(s)`);
 }
 
 if (process.argv[1]?.includes('syncUsers.js')) {

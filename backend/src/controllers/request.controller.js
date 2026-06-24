@@ -1,7 +1,9 @@
 import requestService from '../services/request.service.js';
-import { successResponse } from '../utils/response.js';
+import { successResponse, AppError } from '../utils/response.js';
 import { createAuditLog, getClientMeta } from '../middleware/audit.js';
-
+import hrmsService from '../services/hrms.service.js';
+import { canTrackEmployee, canAccessRequest } from '../utils/requestScope.js';
+import { isEmployee } from '../utils/roles.js';
 export const requestController = {
   list: async (req, res, next) => {
     try {
@@ -15,6 +17,7 @@ export const requestController = {
       const { requests, pagination } = await requestService.listRequests(
         filters,
         { page, limit },
+        req.user,
       );
       return successResponse(res, { message: 'Requests retrieved', data: requests, pagination });
     } catch (err) {
@@ -25,6 +28,9 @@ export const requestController = {
   getById: async (req, res, next) => {
     try {
       const request = await requestService.getRequestById(req.params.id);
+      if (req.user && !canAccessRequest(req.user, request)) {
+        throw new AppError('You do not have access to this request', 403);
+      }
       const meta = getClientMeta(req);
       await createAuditLog({
         action: 'REQUEST_VIEWED',
@@ -45,7 +51,19 @@ export const requestController = {
 
   getByEmployee: async (req, res, next) => {
     try {
-      const requests = await requestService.getRequestsByEmployee(req.params.employeeId);
+      const targetId = req.params.employeeId.trim();
+      if (req.user) {
+        if (isEmployee(req.user.role) && String(req.user.employeeId) !== targetId) {
+          throw new AppError('You can only view your own requests', 403);
+        }
+        if (!isEmployee(req.user.role)) {
+          const employee = await hrmsService.getEmployee(targetId);
+          if (!canTrackEmployee(req.user, employee.department)) {
+            throw new AppError('You can only track staff in your department', 403);
+          }
+        }
+      }
+      const requests = await requestService.getRequestsByEmployee(targetId, req.user);
       return successResponse(res, { message: 'Employee requests retrieved', data: requests });
     } catch (err) {
       next(err);
@@ -78,6 +96,10 @@ export const requestController = {
 
   addComment: async (req, res, next) => {
     try {
+      const existing = await requestService.getRequestById(req.params.id);
+      if (!canAccessRequest(req.user, existing)) {
+        throw new AppError('You do not have access to this request', 403);
+      }
       const { text } = req.body;
       const request = await requestService.addComment(req.params.id, {
         by: req.user.name,
@@ -93,6 +115,10 @@ export const requestController = {
 
   updateQueue: async (req, res, next) => {
     try {
+      const existing = await requestService.getRequestById(req.params.id);
+      if (!canAccessRequest(req.user, existing)) {
+        throw new AppError('You do not have access to this request', 403);
+      }
       const { queueStatus, assignedTo, assignedToUserId } = req.body;
       const request = await requestService.updateQueueStatus(req.params.id, {
         queueStatus, assignedTo, assignedToUserId, user: req.user,

@@ -25,10 +25,20 @@ const SUPER_ADMIN_PAGES: Page[] = [
   ...STAFF_PAGES,
   'form-builder',
   'audit-log',
+  'user-management',
   'settings',
 ];
 
 export type AccessTier = 'super_admin' | 'hod' | 'staff' | 'employee';
+
+export function hasAdminAccess(role: UserRole | undefined): boolean {
+  if (!role) return false;
+  return getAccessTier(role) !== 'employee';
+}
+
+export function isEmployeeSession(role: UserRole | undefined): boolean {
+  return role === 'employee';
+}
 
 export function getAccessTier(role: UserRole): AccessTier {
   if (role === 'super_admin' || role === 'admin') return 'super_admin';
@@ -39,6 +49,7 @@ export function getAccessTier(role: UserRole): AccessTier {
 
 export function canAccessPage(role: UserRole | undefined, page: Page): boolean {
   if (!role) return false;
+  if (page === 'user-management') return role === 'super_admin';
   const tier = getAccessTier(role);
   if (tier === 'super_admin') return SUPER_ADMIN_PAGES.includes(page);
   if (tier === 'staff') return STAFF_PAGES.includes(page);
@@ -52,6 +63,20 @@ export function getDefaultPage(role: UserRole): Page {
   if (tier === 'hod') return 'approvals';
   if (tier === 'staff') return 'work-queue';
   return 'dashboard';
+}
+
+export const MANAGEABLE_ROLES = [
+  { value: 'employee' as UserRole, label: 'Employee' },
+  { value: 'hod' as UserRole, label: 'HOD' },
+];
+
+export const SUPER_ADMIN_STAFF_ID = '12345';
+
+export function isFixedSuperAdmin(user: { role?: UserRole; employeeId?: string | null; email?: string }): boolean {
+  const staffId = String(user.employeeId || '').trim();
+  const email = String(user.email || '').toLowerCase();
+  return user.role === 'super_admin'
+    && (staffId === SUPER_ADMIN_STAFF_ID || email === 'superadmin@mapims.edu.in');
 }
 
 export function getRoleLabel(role: UserRole): string {
@@ -69,10 +94,5 @@ export function getRoleLabel(role: UserRole): string {
 }
 
 export const DEMO_ACCOUNTS = [
-  { group: 'Super Admin', email: 'karthikeyan@company.com', role: 'super_admin' as UserRole },
-  { group: 'Department HOD', email: 'anita.verma@company.com', role: 'hod' as UserRole },
-  { group: 'Department HOD', email: 'suresh.mehta@company.com', role: 'hod' as UserRole },
-  { group: 'Employee', email: 'arjun.sharma@company.com', role: 'employee' as UserRole },
-  { group: 'Employee', email: 'rahul.gupta@company.com', role: 'employee' as UserRole },
-  { group: 'Employee', email: 'sneha.reddy@company.com', role: 'employee' as UserRole },
+  { group: 'Super Admin', email: 'superadmin@mapims.edu.in', role: 'super_admin' as UserRole },
 ];

@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { cn } from '../components/ui/utils';
 import { api } from '../services/api';
 import type { FormField } from '../types';
+import { isDateOfJoiningLabel } from '../utils/formDateFields';
 import { normalizeFormField, normalizeFormFields } from '../utils/hrmsFormFields';
 import { createStaffVerificationFields, ensureStaffVerificationFields, isStaffVerificationField } from '../utils/hrmsVerificationFields';
 import { DEFAULT_FORM_CATEGORY, LEGACY_OWNER_DEPT_MAP } from '../utils/branding';
@@ -46,7 +47,7 @@ function createDefaultBuilderFields(): BuilderField[] {
     placeholder: field.placeholder ?? '',
     helpText: field.helpText ?? '',
     options: [],
-    width: 'half',
+    width: field.width === 'half' ? 'half' : 'full',
     hrmsSource: field.hrmsSource,
     locked: true,
   }));
@@ -124,6 +125,7 @@ function builderFieldsToSchema(fields: BuilderField[]): FormField[] {
     helpText: f.helpText || undefined,
     width: f.width,
     hrmsSource: f.hrmsSource,
+    ...(f.type === 'date' && !isDateOfJoiningLabel(f.label) ? { defaultValue: 'today' } : {}),
     options: f.options.map((o, i) => ({ label: o, value: o.toLowerCase().replace(/\s+/g, '_') || `opt_${i}` })),
   })));
 }
@@ -559,7 +561,7 @@ export function FormBuilderPage() {
             </div>
             <div>
               <label className="block mb-1 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>
-                DEPARTMENT (HRMS)
+                DEPARTMENT
               </label>
               <Select
                 value={formDepartmentId}
@@ -570,7 +572,7 @@ export function FormBuilderPage() {
                 }}
               >
                 <SelectTrigger className="w-full h-9">
-                  <SelectValue placeholder="Select HRMS department">
+                  <SelectValue placeholder="Select department">
                     <span className="flex items-center gap-2 min-w-0">
                       <DepartmentTag departmentId={formDepartmentId} department={formDepartmentName} />
                       <span className="truncate">{formDepartmentName}</span>
@@ -589,7 +591,7 @@ export function FormBuilderPage() {
                 </SelectContent>
               </Select>
               <p className="mt-1 text-muted-foreground" style={{ fontSize: '10px' }}>
-                Owner department from HRMS. All forms are listed under &quot;{DEFAULT_FORM_CATEGORY}&quot;.
+                Owner department for this form. All forms are listed under &quot;{DEFAULT_FORM_CATEGORY}&quot;.
               </p>
             </div>
             <div>

@@ -169,8 +169,8 @@ function RequestRow({ req, i, onClick }: { req: Request; i: number; onClick: () 
 }
 
 /* ── SLA Gauge ───────────────────────────────────────────────── */
-function SLAGauge() {
-  const slaScore = 88;
+function SLAGauge({ total, slaBreached }: { total: number; slaBreached: number }) {
+  const slaScore = total === 0 ? 100 : Math.max(0, Math.round(((total - slaBreached) / total) * 100));
   return (
     <div className="flex flex-col items-center gap-3">
       <CircularProgress value={slaScore} size={100} strokeWidth={7} color="#10b981" trackColor="var(--muted)">
@@ -179,24 +179,38 @@ function SLAGauge() {
           <p className="text-muted-foreground" style={{ fontSize: '9px' }}>SLA</p>
         </div>
       </CircularProgress>
-      <p className="text-muted-foreground text-center" style={{ fontSize: '11px' }}>Compliance Rate</p>
+      <p className="text-muted-foreground text-center" style={{ fontSize: '11px' }}>
+        {total === 0 ? 'No requests yet' : 'Compliance Rate'}
+      </p>
     </div>
   );
 }
 
 /* ── Top forms list ──────────────────────────────────────────── */
-const TOP_FORMS = [
-  { name: 'Leave Application', count: 24, pct: 82 },
-  { name: 'WiFi / Network Access', count: 18, pct: 62 },
-  { name: 'Miss Punch Correction', count: 14, pct: 48 },
-  { name: 'Salary / Travel Advance', count: 9, pct: 31 },
-  { name: 'Official Email Request', count: 6, pct: 21 },
-];
+function TopFormsList({ requests }: { requests: Request[] }) {
+  const topForms = React.useMemo(() => {
+    const counts = requests.reduce<Record<string, number>>((acc, r) => {
+      acc[r.formTitle] = (acc[r.formTitle] ?? 0) + 1;
+      return acc;
+    }, {});
+    const total = requests.length || 1;
+    return Object.entries(counts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([name, count]) => ({ name, count, pct: Math.round((count / total) * 100) }));
+  }, [requests]);
 
-function TopFormsList() {
+  if (topForms.length === 0) {
+    return (
+      <p className="text-muted-foreground text-center py-6" style={{ fontSize: '12px' }}>
+        No requests yet
+      </p>
+    );
+  }
+
   return (
     <div className="space-y-3.5">
-      {TOP_FORMS.map((f, i) => (
+      {topForms.map((f, i) => (
         <ScrollReveal key={f.name} animation="fadeUp">
           <div>
             <div className="flex items-center justify-between mb-1">
@@ -293,10 +307,10 @@ export function DashboardPage() {
       {/* Primary stat cards */}
       <motion.div variants={stagger(0.07)} className="grid grid-cols-2 md:grid-cols-4 gap-4">
         {[
-          { title: "Today's Requests", value: stats.totalToday, change: '+18% vs yesterday', positive: true, icon: FileText, iconColor: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
-          { title: 'Pending Approval', value: stats.pending, change: '-5% vs yesterday', positive: false, icon: Clock, iconColor: 'text-amber-600', iconBg: 'bg-amber-50 dark:bg-amber-950' },
-          { title: 'Completed Today', value: stats.completed, change: '+32% vs yesterday', positive: true, icon: CheckCircle, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-50 dark:bg-emerald-950' },
-          { title: 'SLA Breached', value: stats.slaBreached, change: '+1 vs yesterday', positive: false, icon: AlertTriangle, iconColor: 'text-red-600', iconBg: 'bg-red-50 dark:bg-red-950' },
+          { title: "Today's Requests", value: stats.totalToday, icon: FileText, iconColor: 'text-blue-600', iconBg: 'bg-blue-50 dark:bg-blue-950' },
+          { title: 'Pending Approval', value: stats.pending, icon: Clock, iconColor: 'text-amber-600', iconBg: 'bg-amber-50 dark:bg-amber-950' },
+          { title: 'Completed Today', value: stats.completed, icon: CheckCircle, iconColor: 'text-emerald-600', iconBg: 'bg-emerald-50 dark:bg-emerald-950' },
+          { title: 'SLA Breached', value: stats.slaBreached, icon: AlertTriangle, iconColor: 'text-red-600', iconBg: 'bg-red-50 dark:bg-red-950' },
         ].map((card, i) => (
           <AnimatedStatCard key={card.title} {...card} index={i} />
         ))}
@@ -308,7 +322,7 @@ export function DashboardPage() {
           { title: 'Rejected', value: stats.rejected, icon: XCircle, iconColor: 'text-red-500', iconBg: 'bg-red-50 dark:bg-red-950' },
           { title: 'Processing', value: stats.processing, icon: Loader2, iconColor: 'text-purple-600', iconBg: 'bg-purple-50 dark:bg-purple-950' },
           { title: 'Avg Process Time', value: stats.avgProcessingHours, suffix: 'h', icon: TrendingUp, iconColor: 'text-primary', iconBg: 'bg-primary/10' },
-          { title: 'Active Users', value: 24, icon: Users, iconColor: 'text-indigo-600', iconBg: 'bg-indigo-50 dark:bg-indigo-950' },
+          { title: 'Total Requests', value: requests.length, icon: Users, iconColor: 'text-indigo-600', iconBg: 'bg-indigo-50 dark:bg-indigo-950' },
         ].map((card, i) => (
           <AnimatedStatCard key={card.title} {...card} index={i + 4} />
         ))}
@@ -391,12 +405,17 @@ export function DashboardPage() {
           {/* SLA Gauge */}
           <Card className="border-border/60 shadow-sm">
             <CardContent className="pt-5">
-              <SLAGauge />
+              <SLAGauge total={requests.length} slaBreached={stats.slaBreached} />
               <div className="mt-3 space-y-2">
-                <AnimatedProgress value={88} height={4} color="#10b981" delay={0.3} />
+                <AnimatedProgress
+                  value={requests.length === 0 ? 0 : Math.max(0, Math.round(((requests.length - stats.slaBreached) / requests.length) * 100))}
+                  height={4}
+                  color="#10b981"
+                  delay={0.3}
+                />
                 <div className="flex justify-between">
                   <span className="text-muted-foreground" style={{ fontSize: '10px' }}>On-time</span>
-                  <span className="text-muted-foreground" style={{ fontSize: '10px' }}>Breached: 2</span>
+                  <span className="text-muted-foreground" style={{ fontSize: '10px' }}>Breached: {stats.slaBreached}</span>
                 </div>
               </div>
             </CardContent>
@@ -439,7 +458,7 @@ export function DashboardPage() {
               <CardDescription>Top service forms this month</CardDescription>
             </CardHeader>
             <CardContent>
-              <TopFormsList />
+              <TopFormsList requests={requests} />
             </CardContent>
           </Card>
         </motion.div>
@@ -466,9 +485,13 @@ export function DashboardPage() {
             </CardHeader>
             <CardContent>
               <motion.div variants={stagger(0.06)} initial="hidden" animate="show" className="space-y-1">
-                {recent.map((req, i) => (
-                  <RequestRow key={req.id} req={req} i={i} onClick={() => navigate('request-detail')} />
-                ))}
+                {recent.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8" style={{ fontSize: '12px' }}>No recent requests</p>
+                ) : (
+                  recent.map((req, i) => (
+                    <RequestRow key={req.id} req={req} i={i} onClick={() => navigate('request-detail')} />
+                  ))
+                )}
               </motion.div>
             </CardContent>
           </Card>

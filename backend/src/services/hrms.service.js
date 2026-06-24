@@ -70,7 +70,7 @@ export class HrmsService {
 
   async getDepartments() {
     if (!isHrmsDbConfigured()) {
-      throw new AppError('HRMS database not configured', 503);
+      throw new AppError('Employee database not configured', 503);
     }
 
     const table = config.hrms.db.deptTable;
@@ -86,7 +86,7 @@ export class HrmsService {
 
   async getDesignations(departmentId) {
     if (!isHrmsDbConfigured()) {
-      throw new AppError('HRMS database not configured', 503);
+      throw new AppError('Employee database not configured', 503);
     }
 
     const deptId = String(departmentId ?? '').trim();
@@ -244,7 +244,7 @@ export class HrmsService {
         throw new AppError('Valid 10-digit phone number is required', 400);
       }
       if (!phoneMatchesRow(row, phone)) {
-        throw new AppError('Phone number does not match HRMS records for this staff ID', 403);
+        throw new AppError('Phone number does not match records for this staff ID', 403);
       }
     }
 
@@ -264,7 +264,7 @@ export class HrmsService {
         return await this.getEmployeeFromDb(normalizedId, phone);
       } catch (err) {
         if (err instanceof AppError) throw err;
-        throw new AppError(`HRMS database connection failed: ${formatDbError(err)}`, 503);
+        throw new AppError(`Employee database connection failed: ${formatDbError(err)}`, 503);
       }
     }
 

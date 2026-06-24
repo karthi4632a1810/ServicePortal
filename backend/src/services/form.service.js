@@ -99,7 +99,7 @@ export class FormService {
 
     const deptMeta = buildFormDepartmentMetaFromSchema({ departmentId, department });
     if (!deptMeta.departmentId || !deptMeta.department) {
-      throw new AppError('HRMS department is required', 400);
+      throw new AppError('Department is required', 400);
     }
 
     const resolvedFormId = form?.formId || existingFormId || `form-${slug}`.slice(0, 50);

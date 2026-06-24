@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams, useLocation } from 'react-router';
 import {
@@ -15,14 +15,15 @@ import { api } from '../services/api';
 import { getEmployeeProfile, saveEmployeeProfile } from '../utils/employeeAutofillDb';
 import { buildFormAutofill, normalizePhoneInput } from '../utils/hrmsFormAutofill';
 import { getEffectiveHrmsSource, normalizeFormFields } from '../utils/hrmsFormFields';
+import { buildDefaultDateFormValues } from '../utils/formDateFields';
 import {
   ensureStaffVerificationFields,
-  getPhoneFromAnswers,
   getStaffIdFromAnswers,
 } from '../utils/hrmsVerificationFields';
-import type { FormField, FormSchema, FieldOption } from '../types';
+import { sanitizeUserFacingText } from '../utils/userFacingText';
+import type { FormField, FormSchema, FieldOption, Employee } from '../types';
 
-function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesignations, selectedDepartmentId, hrmsFound }: {
+function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesignations, selectedDepartmentId, hrmsFound, readOnly }: {
   field: FormField;
   value: unknown;
   onChange: (val: unknown) => void;
@@ -30,10 +31,12 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
   hrmsDesignations: FieldOption[];
   selectedDepartmentId: string;
   hrmsFound?: boolean | null;
+  readOnly?: boolean;
 }) {
   const hrmsSource = getEffectiveHrmsSource(field);
-  const isVerificationField = hrmsSource === 'staff_id' || hrmsSource === 'phone';
+  const isVerificationField = hrmsSource === 'staff_id';
   const isVerified = isVerificationField && hrmsFound === true;
+  const isReadOnly = readOnly || isVerificationField;
   const inputClass = cn(
     'w-full h-10 px-3 rounded-lg border bg-input-background text-foreground placeholder:text-muted-foreground transition-all',
     isVerified
@@ -75,7 +78,8 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
           value={value as string ?? ''}
           onChange={e => onChange(e.target.value)}
           placeholder={field.placeholder}
-          className={inputClass}
+          readOnly={isReadOnly}
+          className={cn(inputClass, isReadOnly && 'bg-muted/50 cursor-default')}
           style={{ fontSize: '13px' }}
         />
       ) : field.type === 'textarea' ? (
@@ -195,7 +199,7 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
 }
 
 export function DynamicFormPage() {
-  const { selectedForm, navigate, submitRequest, pageParams, currentUser, forms, setSelectedForm, fetchEmployee } = useApp();
+  const { selectedForm, navigate, submitRequest, pageParams, currentUser, forms, setSelectedForm, fetchEmployee, isEmployeeSession, loading: appLoading } = useApp();
   const routerNavigate = useNavigate();
   const { formId } = useParams();
   const location = useLocation();
@@ -206,9 +210,10 @@ export function DynamicFormPage() {
   const [submitting, setSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [submittedRequestNumber, setSubmittedRequestNumber] = useState('');
-  const [hrmsLoading, setHrmsLoading] = useState(false);
+  const [hrmsEmployee, setHrmsEmployee] = useState<Employee | null>(null);
   const [hrmsFound, setHrmsFound] = useState<boolean | null>(null);
   const [hrmsError, setHrmsError] = useState<string | null>(null);
+  const [hrmsLoading, setHrmsLoading] = useState(false);
   const [hrmsDepartments, setHrmsDepartments] = useState<FieldOption[]>([]);
   const [hrmsDesignations, setHrmsDesignations] = useState<FieldOption[]>([]);
 
@@ -222,7 +227,43 @@ export function DynamicFormPage() {
   );
 
   const staffId = getStaffIdFromAnswers(normalizedFields, formData);
-  const phone = getPhoneFromAnswers(normalizedFields, formData);
+  const verifyRequestRef = useRef(0);
+
+  const verifyHrmsEmployee = useCallback(async (id: string) => {
+    const normalizedId = id.trim();
+    if (!normalizedId) {
+      setHrmsFound(null);
+      setHrmsError(null);
+      setHrmsEmployee(null);
+      return;
+    }
+
+    const requestId = ++verifyRequestRef.current;
+    setHrmsLoading(true);
+    setHrmsError(null);
+
+    try {
+      const emp = await fetchEmployee(normalizedId);
+      if (requestId !== verifyRequestRef.current) return;
+      if (!emp) {
+        setHrmsFound(false);
+        setHrmsEmployee(null);
+        setHrmsError('Employee not found');
+        return;
+      }
+      setHrmsFound(true);
+      setHrmsEmployee(emp);
+      const autofill = buildFormAutofill(emp, normalizedFields);
+      setFormData(prev => ({ ...prev, ...autofill }));
+    } catch (err) {
+      if (requestId !== verifyRequestRef.current) return;
+      setHrmsFound(false);
+      setHrmsEmployee(null);
+      setHrmsError(sanitizeUserFacingText(err instanceof Error ? err.message : 'Failed to load employee details'));
+    } finally {
+      if (requestId === verifyRequestRef.current) setHrmsLoading(false);
+    }
+  }, [fetchEmployee, normalizedFields]);
 
   useEffect(() => {
     if (isPublicForm && form) {
@@ -231,53 +272,52 @@ export function DynamicFormPage() {
   }, [isPublicForm, form, setSelectedForm]);
 
   useEffect(() => {
-    let active = true;
-    getEmployeeProfile().then(profile => {
-      if (!active || !profile) return;
-      const staffField = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'staff_id');
-      const phoneField = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'phone');
-      setFormData(prev => ({
-        ...prev,
-        ...(staffField ? { [staffField.id]: profile.employeeId } : {}),
-        ...(phoneField ? { [phoneField.id]: profile.phone } : {}),
-      }));
-    });
-    return () => { active = false; };
-  }, [normalizedFields]);
+    if (isPublicForm && !appLoading && !isEmployeeSession) {
+      routerNavigate('/', { replace: true });
+    }
+  }, [isPublicForm, appLoading, isEmployeeSession, routerNavigate]);
 
   useEffect(() => {
-    const id = staffId;
-    const ph = normalizePhoneInput(phone);
+    setFormData(buildDefaultDateFormValues(normalizedFields));
+    setHrmsFound(null);
+    setHrmsError(null);
+    setHrmsEmployee(null);
+    setErrors({});
+  }, [form?.id, normalizedFields]);
 
-    if (!id || ph.length < 10) {
-      setHrmsFound(null);
-      setHrmsError(null);
-      return;
-    }
+  useEffect(() => {
+    if (!form?.id || !normalizedFields.length) return;
 
-    const timer = setTimeout(async () => {
-      setHrmsLoading(true);
-      setHrmsError(null);
-      try {
-        const emp = await fetchEmployee(id, phone);
-        if (!emp) {
-          setHrmsFound(false);
-          setHrmsError('Employee not found in HRMS');
-          return;
-        }
-        setHrmsFound(true);
-        const autofill = buildFormAutofill(emp, normalizedFields);
-        setFormData(prev => ({ ...prev, ...autofill }));
-      } catch (err) {
-        setHrmsFound(false);
-        setHrmsError(err instanceof Error ? err.message : 'HRMS verification failed');
-      } finally {
-        setHrmsLoading(false);
+    let active = true;
+    (async () => {
+      const profile = await getEmployeeProfile();
+      if (!active) return;
+
+      const staffField = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'staff_id');
+      const nextStaff = (currentUser?.employeeId || profile?.employeeId || '').trim();
+
+      if (!nextStaff) return;
+
+      if (staffField) {
+        setFormData(prev => ({ ...prev, [staffField.id]: nextStaff }));
       }
+
+      await verifyHrmsEmployee(nextStaff);
+    })();
+
+    return () => { active = false; };
+  }, [form?.id, normalizedFields, verifyHrmsEmployee, currentUser?.employeeId]);
+
+  useEffect(() => {
+    const id = staffId.trim();
+    if (!id || currentUser?.employeeId) return;
+
+    const timer = setTimeout(() => {
+      verifyHrmsEmployee(id);
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [staffId, phone, fetchEmployee, normalizedFields]);
+  }, [staffId, verifyHrmsEmployee, currentUser?.employeeId]);
 
   const departmentFieldId = normalizedFields.find(f => getEffectiveHrmsSource(f) === 'department')?.id;
   const selectedDepartmentId = departmentFieldId ? String(formData[departmentFieldId] ?? '') : '';
@@ -332,11 +372,9 @@ export function DynamicFormPage() {
   const validate = () => {
     const errs: Record<string, string> = {};
     if (!staffId) errs._hrms = 'Staff ID is required';
-    if (!phone) errs._hrms = 'Phone number is required';
-    if (normalizePhoneInput(phone).length < 10) errs._hrms = 'Enter a valid 10-digit phone number';
-    if (hrmsFound !== true) errs._hrms = hrmsError || 'Verify your Staff ID and phone number against HRMS before submitting';
+    if (hrmsFound !== true) errs._hrms = hrmsError || 'Could not load your details. Check your Staff ID.';
     normalizedFields.forEach(f => {
-      if (getEffectiveHrmsSource(f) === 'staff_id' || getEffectiveHrmsSource(f) === 'phone') return;
+      if (getEffectiveHrmsSource(f) === 'staff_id') return;
       if (f.required && ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time', 'dropdown', 'radio'].includes(f.type)) {
         if (!formData[f.id]) errs[f.id] = `${f.label} is required`;
       }
@@ -352,7 +390,8 @@ export function DynamicFormPage() {
     }
     setSubmitting(true);
     try {
-      await saveEmployeeProfile({ employeeId: staffId, phone });
+      const hrmsPhone = hrmsEmployee?.mobile ? normalizePhoneInput(hrmsEmployee.mobile) : '';
+      await saveEmployeeProfile({ employeeId: staffId, phone: hrmsPhone });
 
       const result = await submitRequest({
         employeeId: staffId,
@@ -523,6 +562,7 @@ export function DynamicFormPage() {
                 hrmsDesignations={hrmsDesignations}
                 selectedDepartmentId={selectedDepartmentId}
                 hrmsFound={hrmsFound}
+                readOnly={Boolean(currentUser?.employeeId && getEffectiveHrmsSource(field) === 'staff_id')}
               />
             ))}
           </div>

@@ -6,8 +6,7 @@ import Permission from '../models/Permission.js';
 import WorkflowTemplate from '../models/WorkflowTemplate.js';
 import { loadConfigFile } from '../utils/fileLoader.js';
 import { syncDemoUsers } from './syncUsers.js';
-
-const DEFAULT_PASSWORD = 'Password@123';
+import { SUPER_ADMIN_PASSWORD } from './superadmin.js';
 
 async function seedConfigCollection(Model, filename, mapFn) {
   const items = await loadConfigFile(filename);
@@ -54,7 +53,8 @@ export async function seedDatabase() {
 
   await syncDemoUsers();
 
-  console.log('Seed completed. Default password:', DEFAULT_PASSWORD);
+  console.log('Seed completed. Run pnpm seed:superadmin to reset super admin password.');
+  console.log('Super admin Staff ID: 12345 | default password:', SUPER_ADMIN_PASSWORD);
 }
 
 if (process.argv[1]?.includes('seed.js')) {

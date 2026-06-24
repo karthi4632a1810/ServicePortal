@@ -21,8 +21,9 @@ API runs at `http://localhost:5000`
 
 ## Default Admin Login
 
-- Email: `karthikeyan@company.com`
-- Password: `Password@123`
+- Email: `karthi@mapims.edu.in`
+- Password: `admin@mapims.edu.in`
+- Staff ID: `60464`
 
 ## API Endpoints
 

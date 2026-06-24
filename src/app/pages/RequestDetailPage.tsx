@@ -47,13 +47,27 @@ function TimelineEvent({ by, role, text, timestamp, type, isLast }: {
 }
 
 export function RequestDetailPage() {
-  const { selectedRequest, navigate, requests, performApprovalAction, currentUser } = useApp();
+  const { selectedRequest, navigate, performApprovalAction, currentUser } = useApp();
   const [comment, setComment] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [actionError, setActionError] = useState('');
 
-  const req = selectedRequest ?? requests[0];
-  if (!req) return null;
+  const req = selectedRequest;
+  if (!req) {
+    return (
+      <div className="p-6 text-center">
+        <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No request selected</p>
+        <button
+          onClick={() => navigate('approvals')}
+          className="mt-4 text-primary hover:underline"
+          style={{ fontSize: '13px' }}
+        >
+          Back to Approvals
+        </button>
+      </div>
+    );
+  }
   const statusCfg = STATUS_CONFIG[req.status];
   const StatusIcon = statusCfg.icon;
 
@@ -73,10 +87,13 @@ export function RequestDetailPage() {
     const action = actionMap[activeAction];
     if (!action) return;
     setSubmitting(true);
+    setActionError('');
     try {
       await performApprovalAction(req.id, action, comment);
       setActiveAction(null);
       setComment('');
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Action failed. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -236,6 +253,12 @@ export function RequestDetailPage() {
                         className="w-full px-3 py-2 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
                         style={{ fontSize: '13px' }}
                       />
+                      {actionError && (
+                        <p className="text-destructive flex items-center gap-1.5" style={{ fontSize: '12px' }}>
+                          <AlertCircle className="size-3.5 shrink-0" />
+                          {actionError}
+                        </p>
+                      )}
                       <div className="flex gap-2 justify-end">
                         <button
                           onClick={() => { setActiveAction(null); setComment(''); }}

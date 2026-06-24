@@ -8,7 +8,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
+import { isFixedSuperAdmin, getRoleLabel } from '../utils/roleAccess';
 import { ACCENT_COLORS } from '../utils/userPreferences';
+import { PasswordInput } from '../components/ui/password-input';
+import { UserAvatar } from '../components/ui/user-avatar';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -55,20 +58,55 @@ function ToggleSetting({
 }
 
 export function SettingsPage() {
-  const { currentUser, preferences, setTheme, updatePreferences, isAuthenticated, login, logout, apiLoginUsers } = useApp();
+  const {
+    currentUser, preferences, setTheme, updatePreferences, isAuthenticated,
+    login, logout, changePassword, apiLoginUsers,
+  } = useApp();
   const routerNavigate = useNavigate();
   const [activeSection, setActiveSection] = useState('profile');
   const [saved, setSaved] = useState(false);
   const [loginEmail, setLoginEmail] = useState(DEMO_LOGIN_USERS[0].email);
-  const [loginPassword, setLoginPassword] = useState('Password@123');
+  const [loginPassword, setLoginPassword] = useState('superadmin');
   const [loginError, setLoginError] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
 
   const user = currentUser ?? apiLoginUsers[0];
+  const superAdminLocked = isFixedSuperAdmin(user);
 
   const handleSave = () => {
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
+  };
+
+  const handlePasswordChange = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError('');
+    setPasswordSuccess(false);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('New password and confirmation do not match');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      await changePassword(oldPassword, newPassword, confirmPassword);
+      setOldPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPasswordSuccess(true);
+      setTimeout(() => setPasswordSuccess(false), 3000);
+    } catch (err) {
+      setPasswordError(err instanceof Error ? err.message : 'Failed to change password');
+    } finally {
+      setChangingPassword(false);
+    }
   };
 
   return (
@@ -107,29 +145,44 @@ export function SettingsPage() {
               <Card className="border-border/60 shadow-sm">
                 <CardHeader>
                   <CardTitle>Profile Information</CardTitle>
-                  <CardDescription>Update your personal details and contact information</CardDescription>
+                  <CardDescription>
+                    Update your contact details. Department and designation are synced from HRMS and cannot be changed here.
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex items-center gap-4">
-                    <div className="size-16 rounded-2xl bg-primary flex items-center justify-center">
-                      <span className="text-primary-foreground font-bold" style={{ fontSize: '22px' }}>{user.initials}</span>
-                    </div>
+                    <UserAvatar
+                      name={user.name}
+                      initials={user.initials}
+                      employeeId={user.employeeId}
+                      avatar={user.avatar}
+                      className="size-16 rounded-2xl"
+                      fallbackClassName="rounded-2xl text-lg"
+                    />
                     <div>
-                      <button className="px-3 py-1.5 rounded-lg border border-border text-foreground hover:bg-muted transition-colors"
-                        style={{ fontSize: '12px' }}>
-                        Change Photo
-                      </button>
-                      <p className="text-muted-foreground mt-1" style={{ fontSize: '11px' }}>JPG, PNG or GIF. Max 2MB</p>
+                      <p className="text-foreground" style={{ fontSize: '14px', fontWeight: 600 }}>{user.name}</p>
+                      <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{user.department}</p>
+                      {user.designation && (
+                        <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{user.designation}</p>
+                      )}
+                      {user.employeeId && (
+                        <p className="text-muted-foreground" style={{ fontSize: '11px' }}>Staff ID: {user.employeeId}</p>
+                      )}
                     </div>
                   </div>
 
                   <div className="grid grid-cols-2 gap-4">
                     {[
-                      { label: 'Full Name', value: user.name, type: 'text' },
-                      { label: 'Email Address', value: user.email, type: 'email' },
-                      { label: 'Department', value: user.department, type: 'text' },
-                      { label: 'Role', value: user.role.replace(/_/g, ' '), type: 'text' },
-                    ].map(({ label, value, type }) => (
+                      { label: 'Full Name', value: user.name, type: 'text', readOnly: false },
+                      { label: 'Email Address', value: user.email, type: 'email', readOnly: false },
+                      { label: 'Department', value: user.department, type: 'text', readOnly: true },
+                      {
+                        label: 'Designation',
+                        value: user.designation || getRoleLabel(user.role),
+                        type: 'text',
+                        readOnly: true,
+                      },
+                    ].map(({ label, value, type, readOnly }) => (
                       <div key={label}>
                         <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>
                           {label.toUpperCase()}
@@ -137,7 +190,15 @@ export function SettingsPage() {
                         <input
                           type={type}
                           defaultValue={value}
-                          className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                          readOnly={readOnly}
+                          disabled={readOnly}
+                          tabIndex={readOnly ? -1 : undefined}
+                          className={cn(
+                            'w-full h-9 px-3 rounded-lg border border-border text-foreground outline-none transition-all',
+                            readOnly
+                              ? 'bg-muted text-muted-foreground cursor-not-allowed opacity-80'
+                              : 'bg-input-background focus:ring-2 focus:ring-primary/30 focus:border-primary',
+                          )}
                           style={{ fontSize: '13px' }}
                         />
                       </div>
@@ -229,12 +290,10 @@ export function SettingsPage() {
                       </div>
                       <div>
                         <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>PASSWORD</label>
-                        <input
-                          type="password"
+                        <PasswordInput
                           value={loginPassword}
                           onChange={e => setLoginPassword(e.target.value)}
-                          className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30"
-                          style={{ fontSize: '13px' }}
+                          inputClassName="h-9 bg-input-background"
                         />
                       </div>
                       {loginError && (
@@ -266,19 +325,65 @@ export function SettingsPage() {
               <Card className="border-border/60 shadow-sm">
                 <CardHeader>
                   <CardTitle>Change Password</CardTitle>
-                  <CardDescription>Update your account password regularly for security</CardDescription>
+                  <CardDescription>
+                    {superAdminLocked
+                      ? 'Super admin password is managed via seed:superadmin only.'
+                      : 'Update your account password regularly for security'}
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-4">
-                  {['Current Password', 'New Password', 'Confirm New Password'].map(label => (
-                    <div key={label}>
-                      <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>{label.toUpperCase()}</label>
-                      <input type="password" className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary" style={{ fontSize: '13px' }} />
+                <CardContent>
+                  {superAdminLocked ? (
+                    <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
+                      Run <code className="px-1.5 py-0.5 rounded bg-muted">pnpm seed:superadmin</code> on the server to update the super admin password.
+                    </p>
+                  ) : (
+                  <form onSubmit={handlePasswordChange} className="space-y-4">
+                    <div>
+                      <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>CURRENT PASSWORD</label>
+                      <PasswordInput
+                        value={oldPassword}
+                        onChange={e => setOldPassword(e.target.value)}
+                        inputClassName="h-9 bg-input-background"
+                        required
+                      />
                     </div>
-                  ))}
-                  <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                    style={{ fontSize: '13px', fontWeight: 500 }}>
-                    Update Password
-                  </button>
+                    <div>
+                      <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>NEW PASSWORD</label>
+                      <PasswordInput
+                        value={newPassword}
+                        onChange={e => setNewPassword(e.target.value)}
+                        inputClassName="h-9 bg-input-background"
+                        required
+                        minLength={4}
+                      />
+                    </div>
+                    <div>
+                      <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>CONFIRM NEW PASSWORD</label>
+                      <PasswordInput
+                        value={confirmPassword}
+                        onChange={e => setConfirmPassword(e.target.value)}
+                        inputClassName="h-9 bg-input-background"
+                        required
+                        minLength={4}
+                      />
+                    </div>
+                    {passwordError && (
+                      <p className="text-destructive" style={{ fontSize: '12px' }}>{passwordError}</p>
+                    )}
+                    {passwordSuccess && (
+                      <p className="text-emerald-600" style={{ fontSize: '12px' }}>Password changed successfully.</p>
+                    )}
+                    <button
+                      type="submit"
+                      disabled={changingPassword || !oldPassword || !newPassword || !confirmPassword}
+                      className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center gap-2"
+                      style={{ fontSize: '13px', fontWeight: 500 }}
+                    >
+                      <Key className="size-4" />
+                      {changingPassword ? 'Saving...' : 'Update Password'}
+                    </button>
+                  </form>
+                  )}
                 </CardContent>
               </Card>
 
@@ -406,7 +511,7 @@ export function SettingsPage() {
           {activeSection === 'integrations' && (
             <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }} className="space-y-4">
               {[
-                { name: 'HRMS System', desc: 'Employee data source — SQL Server integration', status: 'Connected', icon: '🏢' },
+                { name: 'Employee Directory', desc: 'Employee data source — database integration', status: 'Connected', icon: '🏢' },
                 { name: 'Email Server (SMTP)', desc: 'Nodemailer configuration for notifications', status: 'Connected', icon: '📧' },
                 { name: 'Active Directory', desc: 'LDAP authentication for SSO login', status: 'Not Configured', icon: '🔐' },
                 { name: 'WhatsApp Business', desc: 'WhatsApp notifications via Cloud API', status: 'Not Configured', icon: '💬' },

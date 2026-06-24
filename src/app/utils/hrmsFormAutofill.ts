@@ -108,7 +108,7 @@ export function buildFormAutofill(
 
   for (const field of fields) {
     if (SKIPPED_TYPES.has(field.type)) continue;
-    if (getEffectiveHrmsSource(field) === 'staff_id' || getEffectiveHrmsSource(field) === 'phone') continue;
+    if (getEffectiveHrmsSource(field) === 'staff_id') continue;
 
     let value: unknown;
 
@@ -116,6 +116,8 @@ export function buildFormAutofill(
       value = employee.departmentId;
     } else if (getEffectiveHrmsSource(field) === 'designation') {
       value = employee.designationId;
+    } else if (getEffectiveHrmsSource(field) === 'phone') {
+      value = employee.mobile;
     } else {
       const label = normLabel(field.label);
       value = valueForLabel(label, employee);

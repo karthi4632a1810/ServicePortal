@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   Search, User, ChevronRight, FileText, Clock, CheckCircle, XCircle, Loader2,
@@ -7,6 +7,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
+import { getAccessTier } from '../utils/roleAccess';
 import { api } from '../services/api';
 import type { Employee, Request } from '../types';
 import { getEmployeeProfileFields } from '../utils/employeeProfileFields';
@@ -118,32 +119,102 @@ function RequestStatusCard({ req }: { req: Request }) {
   );
 }
 
+function departmentsMatch(a: string | undefined, b: string | undefined) {
+  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+}
+
 export function EmployeePortalPage() {
-  const { navigate, fetchEmployee } = useApp();
+  const { navigate, fetchEmployee, currentUser, requests } = useApp();
+  const accessTier = currentUser ? getAccessTier(currentUser.role) : null;
+  const isEmployeeView = accessTier === 'employee' && Boolean(currentUser?.employeeId);
+
+  const portalSubtitle = (() => {
+    if (accessTier === 'super_admin') {
+      return 'Look up any staff ID to view and track their form requests across all departments.';
+    }
+    if (accessTier === 'hod') {
+      return `Look up staff in ${currentUser?.department || 'your department'} to view and track their form requests.`;
+    }
+    if (accessTier === 'employee') {
+      return 'View and track your form requests.';
+    }
+    return 'Enter a Staff ID to view and track form requests.';
+  })();
   const [employeeId, setEmployeeId] = useState('');
   const [foundEmployee, setFoundEmployee] = useState<Employee | null>(null);
   const [employeeRequests, setEmployeeRequests] = useState<Request[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [isLoadingSelf, setIsLoadingSelf] = useState(false);
   const [error, setError] = useState('');
 
+  const loadEmployeeData = useCallback(async (id: string) => {
+    const emp = await fetchEmployee(id);
+    if (!emp) return null;
+    const res = await api.getEmployeeRequests(id);
+    return { emp, reqs: res.data };
+  }, [fetchEmployee]);
+
+  const loadSelf = useCallback(async () => {
+    if (!currentUser?.employeeId) return;
+    setIsLoadingSelf(true);
+    setError('');
+    try {
+      const result = await loadEmployeeData(currentUser.employeeId);
+      if (!result) return;
+      setFoundEmployee(result.emp);
+      setEmployeeRequests(result.reqs);
+    } catch (err) {
+      setFoundEmployee(null);
+      setEmployeeRequests([]);
+      setError(err instanceof Error ? err.message : 'Failed to load your requests.');
+    } finally {
+      setIsLoadingSelf(false);
+    }
+  }, [currentUser?.employeeId, loadEmployeeData]);
+
+  useEffect(() => {
+    if (!isEmployeeView) return;
+    void loadSelf();
+  }, [isEmployeeView, loadSelf]);
+
+  useEffect(() => {
+    if (isEmployeeView && requests.length > 0) {
+      setEmployeeRequests(requests);
+    }
+  }, [isEmployeeView, requests]);
+
   const handleSearch = async () => {
-    if (!employeeId.trim()) {
+    const id = employeeId.trim();
+    if (!id) {
       setError('Please enter your Employee ID');
+      return;
+    }
+    if (currentUser?.role === 'employee' && currentUser.employeeId && id !== currentUser.employeeId) {
+      setError('You can only view your own records.');
       return;
     }
     setIsSearching(true);
     setError('');
     try {
-      const emp = await fetchEmployee(employeeId.trim());
-      if (emp) {
-        setFoundEmployee(emp);
-        const res = await api.getEmployeeRequests(employeeId.trim());
-        setEmployeeRequests(res.data);
+      const result = await loadEmployeeData(id);
+      if (!result) return;
+      if (currentUser?.role === 'hod' && !departmentsMatch(currentUser.department, result.emp.department)) {
+        setFoundEmployee(null);
+        setEmployeeRequests([]);
+        setError('You can only track staff in your department.');
+        return;
       }
-    } catch {
+      setFoundEmployee(result.emp);
+      setEmployeeRequests(result.reqs);
+    } catch (err) {
       setFoundEmployee(null);
       setEmployeeRequests([]);
-      setError('Employee ID not found. Please check and try again.');
+      const message = err instanceof Error ? err.message : '';
+      setError(
+        message.includes('department')
+          ? 'You can only track staff in your department.'
+          : message || 'Employee ID not found. Please check and try again.',
+      );
     } finally {
       setIsSearching(false);
     }
@@ -164,11 +235,12 @@ export function EmployeePortalPage() {
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Employee Portal</h1>
         </div>
         <p className="text-muted-foreground ml-11" style={{ fontSize: '13px' }}>
-          No login required. Enter your Employee ID to view and track your forms.
+          {portalSubtitle}
         </p>
       </motion.div>
 
-      {/* Search Card */}
+      {/* Staff lookup — admins/HOD only */}
+      {!isEmployeeView && (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}>
         <Card className="border-border/60 shadow-sm">
           <CardContent className="pt-6">
@@ -179,7 +251,11 @@ export function EmployeePortalPage() {
                   value={employeeId}
                   onChange={e => { setEmployeeId(e.target.value); setError(''); }}
                   onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                  placeholder="Enter Staff ID (e.g., 60464)"
+                  placeholder={
+                    accessTier === 'hod'
+                      ? `Enter Staff ID (${currentUser?.department || 'your department'})`
+                      : 'Enter Staff ID (e.g., 60464)'
+                  }
                   className="w-full h-10 pl-10 pr-4 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
                   style={{ fontSize: '14px' }}
                 />
@@ -211,11 +287,41 @@ export function EmployeePortalPage() {
 
             <p className="text-muted-foreground mt-3" style={{ fontSize: '11px' }}>
               <Shield className="size-3 inline mr-1" />
-              Use your HRMS staff ID and registered mobile number (e.g. 60464)
+              {accessTier === 'hod'
+                ? 'Only staff belonging to your department can be tracked.'
+                : accessTier === 'super_admin'
+                  ? 'Super admin can track requests from all departments.'
+                  : 'Use your registered Staff ID (e.g. 60464)'}
             </p>
           </CardContent>
         </Card>
       </motion.div>
+      )}
+
+      {isEmployeeView && isLoadingSelf && !foundEmployee && (
+        <Card className="border-border/60 shadow-sm">
+          <CardContent className="py-16 flex flex-col items-center gap-3">
+            <Loader2 className="size-8 text-primary animate-spin" />
+            <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Loading your requests...</p>
+          </CardContent>
+        </Card>
+      )}
+
+      {isEmployeeView && error && !foundEmployee && (
+        <Card className="border-destructive/30 shadow-sm">
+          <CardContent className="py-8 flex flex-col items-center gap-3 text-center">
+            <AlertCircle className="size-8 text-destructive" />
+            <p className="text-destructive" style={{ fontSize: '13px' }}>{error}</p>
+            <button
+              onClick={() => void loadSelf()}
+              className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90"
+              style={{ fontSize: '12px', fontWeight: 500 }}
+            >
+              Retry
+            </button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Employee Profile */}
       <AnimatePresence>
@@ -289,7 +395,9 @@ export function EmployeePortalPage() {
             {/* Employee's Requests */}
             <Card className="border-border/60 shadow-sm">
               <CardHeader>
-                <CardTitle>Your Request History</CardTitle>
+                <CardTitle>
+                  {accessTier === 'employee' ? 'Your Request History' : 'Request History'}
+                </CardTitle>
               </CardHeader>
               <CardContent>
                 {employeeRequests.length > 0 ? (

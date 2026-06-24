@@ -17,27 +17,9 @@
       "label": "Staff ID",
       "required": true,
       "placeholder": "e.g. 60464",
-      "width": "half",
-      "hrmsSource": "staff_id",
-      "helpText": "Enter your HRMS staff ID to load your details."
-    },
-    {
-      "id": "hrms-staff-phone",
-      "type": "phone",
-      "label": "Phone",
-      "required": true,
-      "placeholder": "e.g. 9876543210",
-      "width": "half",
-      "hrmsSource": "phone",
-      "helpText": "Registered mobile number must match HRMS records."
-    },
-    {
-      "id": "f1",
-      "type": "section_title",
-      "label": "Employee Information",
-      "required": false,
       "width": "full",
-      "options": []
+      "hrmsSource": "staff_id",
+      "helpText": "Your staff ID — details load automatically from records."
     },
     {
       "id": "f3",
@@ -68,10 +50,11 @@
     {
       "id": "f4",
       "type": "date",
-      "label": "Request Date",
+      "label": "Date",
       "required": true,
       "width": "half",
-      "options": []
+      "options": [],
+      "defaultValue": "today"
     },
     {
       "id": "f8",
@@ -97,15 +80,16 @@
     {
       "id": "f9",
       "type": "date",
-      "label": "DOB (Date of Birth)",
+      "label": "Date",
       "required": true,
       "width": "half",
-      "options": []
+      "options": [],
+      "defaultValue": "today"
     },
     {
       "id": "f10",
       "type": "date",
-      "label": "DOJ (Date of Joining)",
+      "label": "Date of Joining",
       "required": true,
       "width": "half",
       "options": []

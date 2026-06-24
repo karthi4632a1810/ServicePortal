@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Search, Bell, Sun, Moon, ChevronRight, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../ui/utils';
+import { UserAvatar } from '../ui/user-avatar';
 import { useApp } from '../../context/AppContext';
 
 const PAGE_LABELS: Record<string, string> = {
@@ -15,6 +16,7 @@ const PAGE_LABELS: Record<string, string> = {
   'workflow-pipeline': 'Workflow Pipeline',
   'work-queue': 'Work Queue',
   'form-builder': 'Form Builder',
+  'user-management': 'User Management',
   'audit-log': 'Audit Log',
   'settings': 'Settings',
 };
@@ -102,7 +104,6 @@ export function AppHeader() {
             title="Notifications"
           >
             <Bell className="size-4" />
-            <span className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-destructive" />
           </button>
           <AnimatePresence>
             {showNotifications && (
@@ -115,22 +116,10 @@ export function AppHeader() {
               >
                 <div className="px-4 py-3 border-b border-border flex items-center justify-between">
                   <span style={{ fontSize: '13px', fontWeight: 500 }} className="text-foreground">Notifications</span>
-                  <span className="px-1.5 py-0.5 rounded bg-primary/10 text-primary" style={{ fontSize: '10px', fontWeight: 600 }}>3 New</span>
                 </div>
-                {[
-                  { title: 'Leave request pending', desc: 'Arjun Sharma - waiting for HOD approval', time: '5m ago', dot: 'bg-amber-500' },
-                  { title: 'WiFi request approved', desc: 'Rahul Gupta - VPN access granted', time: '1h ago', dot: 'bg-emerald-500' },
-                  { title: 'SLA breach warning', desc: 'REQ-2024-0001 approaching deadline', time: '2h ago', dot: 'bg-red-500' },
-                ].map((n, i) => (
-                  <div key={i} className="px-4 py-3 flex gap-3 hover:bg-muted/50 cursor-pointer transition-colors">
-                    <div className={cn('size-2 rounded-full mt-1.5 shrink-0', n.dot)} />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-foreground truncate" style={{ fontSize: '12px', fontWeight: 500 }}>{n.title}</p>
-                      <p className="text-muted-foreground truncate" style={{ fontSize: '11px' }}>{n.desc}</p>
-                      <p className="text-muted-foreground" style={{ fontSize: '10px' }}>{n.time}</p>
-                    </div>
-                  </div>
-                ))}
+                <div className="px-4 py-8 text-center">
+                  <p className="text-muted-foreground" style={{ fontSize: '12px' }}>No notifications</p>
+                </div>
               </motion.div>
             )}
           </AnimatePresence>
@@ -147,11 +136,14 @@ export function AppHeader() {
 
         {/* Avatar */}
         {currentUser && (
-          <div
-            className="size-8 rounded-full bg-primary flex items-center justify-center cursor-pointer hover:opacity-90 transition-opacity"
-            title={currentUser.name}
-          >
-            <span className="text-primary-foreground font-semibold" style={{ fontSize: '11px' }}>{currentUser.initials}</span>
+          <div title={currentUser.name}>
+            <UserAvatar
+              name={currentUser.name}
+              initials={currentUser.initials}
+              employeeId={currentUser.employeeId}
+              avatar={currentUser.avatar}
+              className="size-8 cursor-pointer hover:opacity-90 transition-opacity"
+            />
           </div>
         )}
       </div>

@@ -1,4 +1,6 @@
 import type { FormField } from '../types';
+import { normalizeDateField } from './formDateFields';
+import { sanitizeUserFacingText } from './userFacingText';
 
 function normLabel(label: string): string {
   return label.toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
@@ -28,42 +30,45 @@ export function normalizeFormField(field: FormField): FormField {
   const label = normLabel(field.label);
   let next = { ...field };
 
+  if (next.placeholder) next.placeholder = sanitizeUserFacingText(next.placeholder);
+  if (next.helpText) next.helpText = sanitizeUserFacingText(next.helpText);
+
   if (label === 'employee details' && next.type !== 'employee_info') {
     next = { ...next, type: 'employee_info' };
   }
 
   const hrmsSource = inferHrmsSource(next);
-  if (!hrmsSource) return next;
+  if (!hrmsSource) return normalizeDateField(next);
 
   if (hrmsSource === 'staff_id') {
-    return {
+    return normalizeDateField({
       ...next,
       type: 'text',
       label: 'Staff ID',
       hrmsSource,
       width: next.width === 'full' ? 'half' : (next.width ?? 'half'),
       placeholder: next.placeholder || 'e.g. 60464',
-    };
+    });
   }
 
   if (hrmsSource === 'phone') {
-    return {
+    return normalizeDateField({
       ...next,
       type: 'phone',
       label: 'Phone',
       hrmsSource,
       width: next.width === 'full' ? 'half' : (next.width ?? 'half'),
       placeholder: next.placeholder || 'e.g. 9876543210',
-    };
+    });
   }
 
-  return {
+  return normalizeDateField({
     ...next,
     type: next.type === 'text' || next.type === 'textarea' ? 'dropdown' : next.type,
     hrmsSource,
     options: [],
     placeholder: next.placeholder || (hrmsSource === 'department' ? 'Select department' : 'Select designation'),
-  };
+  });
 }
 
 export function normalizeFormFields(fields: FormField[]): FormField[] {

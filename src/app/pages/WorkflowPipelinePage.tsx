@@ -460,18 +460,15 @@ function TimelineView({ requests, onSelect }: { requests: WFRequest[]; onSelect:
 }
 
 /* ── Analytics view ──────────────────────────────────────────── */
-const WEEKLY_DATA = [
-  { day: 'Mon', submitted: 8, approved: 6, rejected: 1, completed: 5 },
-  { day: 'Tue', submitted: 14, approved: 11, rejected: 2, completed: 9 },
-  { day: 'Wed', submitted: 6, approved: 5, rejected: 1, completed: 7 },
-  { day: 'Thu', submitted: 18, approved: 13, rejected: 2, completed: 11 },
-  { day: 'Fri', submitted: 11, approved: 9, rejected: 1, completed: 8 },
-  { day: 'Sat', submitted: 3, approved: 3, rejected: 0, completed: 4 },
-  { day: 'Sun', submitted: 1, approved: 1, rejected: 0, completed: 2 },
-];
 const TOOLTIP_STYLE = { borderRadius: '10px', border: '1px solid var(--border)', background: 'var(--card)', color: 'var(--foreground)', fontSize: '11px', boxShadow: '0 4px 20px rgba(0,0,0,0.08)' };
 
-function AnalyticsView({ requests }: { requests: WFRequest[] }) {
+function AnalyticsView({
+  requests,
+  weeklyChart,
+}: {
+  requests: WFRequest[];
+  weeklyChart: Array<{ day: string; submitted: number; approved: number; rejected: number; completed: number }>;
+}) {
   const byCategory = requests.reduce<Record<string, number>>((a, r) => ({ ...a, [r.category]: (a[r.category] ?? 0) + 1 }), {});
   const byDept = requests.reduce<Record<string, number>>((a, r) => ({ ...a, [r.employeeDept]: (a[r.employeeDept] ?? 0) + 1 }), {});
 
@@ -486,7 +483,7 @@ function AnalyticsView({ requests }: { requests: WFRequest[] }) {
             </CardHeader>
             <CardContent>
               <ResponsiveContainer width="100%" height={200}>
-                <AreaChart data={WEEKLY_DATA} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
+                <AreaChart data={weeklyChart} margin={{ top: 4, right: 4, left: -28, bottom: 0 }}>
                   <defs>
                     {[['sub', '#2563EB'], ['app', '#059669']].map(([id, color]) => (
                       <linearGradient key={id} id={`g-${id}`} x1="0" y1="0" x2="0" y2="1">
@@ -515,16 +512,20 @@ function AnalyticsView({ requests }: { requests: WFRequest[] }) {
               <CardTitle>By Category</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {Object.entries(byCategory).map(([cat, count], i) => (
-                <div key={cat}>
-                  <div className="flex justify-between mb-1">
-                    <span className="text-foreground" style={{ fontSize: '12px' }}>{cat}</span>
-                    <span className="text-muted-foreground" style={{ fontSize: '11px' }}>{count} req</span>
+              {Object.keys(byCategory).length === 0 ? (
+                <p className="text-muted-foreground text-center py-6" style={{ fontSize: '12px' }}>No requests yet</p>
+              ) : (
+                Object.entries(byCategory).map(([cat, count], i) => (
+                  <div key={cat}>
+                    <div className="flex justify-between mb-1">
+                      <span className="text-foreground" style={{ fontSize: '12px' }}>{cat}</span>
+                      <span className="text-muted-foreground" style={{ fontSize: '11px' }}>{count} req</span>
+                    </div>
+                    <AnimatedProgress value={(count / requests.length) * 100} height={5} delay={i * 0.1}
+                      color={['#2563eb', '#7c3aed', '#10b981'][i % 3]} />
                   </div>
-                  <AnimatedProgress value={(count / requests.length) * 100} height={5} delay={i * 0.1}
-                    color={['#2563eb', '#7c3aed', '#10b981'][i % 3]} />
-                </div>
-              ))}
+                ))
+              )}
             </CardContent>
           </Card>
         </motion.div>
@@ -566,7 +567,7 @@ const FILTERS: { id: FilterKey; label: string; dot?: string }[] = [
 
 /* ── Main page ───────────────────────────────────────────────── */
 export function WorkflowPipelinePage() {
-  const { requests, loading: appLoading, currentUser } = useApp();
+  const { requests, loading: appLoading, currentUser, chartData } = useApp();
   const workflowRequests = useMemo(() => requestsToWorkflow(requests), [requests]);
   const [view, setView] = useState<'pipeline' | 'timeline' | 'analytics'>('pipeline');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -774,7 +775,7 @@ export function WorkflowPipelinePage() {
               </motion.div>
             ) : (
               <motion.div key="analytics" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }}>
-                <AnalyticsView requests={filtered} />
+                <AnalyticsView requests={filtered} weeklyChart={chartData.weekly} />
               </motion.div>
             )}
           </AnimatePresence>

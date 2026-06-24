@@ -1,6 +1,8 @@
 import Request from '../models/Request.js';
 import workflowEngine from './workflowEngine.service.js';
 import { isSuperAdmin } from '../utils/roles.js';
+import { canAccessRequest } from '../utils/requestScope.js';
+import { AppError } from '../utils/response.js';
 
 function mapRequest(r) {
   const obj = r.toObject ? r.toObject() : r;
@@ -54,7 +56,11 @@ export class ApprovalService {
       );
     } else if (status === 'completed') {
       filtered = allRequests.filter((req) => req.status === 'completed');
+    } else if (status === 'all') {
+      filtered = allRequests;
     }
+
+    filtered = filtered.filter((req) => canAccessRequest(user, req));
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
@@ -75,16 +81,19 @@ export class ApprovalService {
   async processAction(requestId, action, { user, remarks }) {
     const request = await Request.findById(requestId);
     if (!request) {
-      const err = new Error('Request not found');
-      err.statusCode = 404;
-      throw err;
+      throw new AppError('Request not found', 404);
     }
 
     const step = workflowEngine.getCurrentStep(request);
     if (!workflowEngine.canUserActOnStep(user, step, request) && !isSuperAdmin(user.role)) {
-      const err = new Error('You are not authorized to act on this request');
-      err.statusCode = 403;
-      throw err;
+      throw new AppError('You are not authorized to act on this request', 403);
+    }
+    if (!canAccessRequest(user, request)) {
+      throw new AppError('You do not have access to this request', 403);
+    }
+
+    if ((action === 'reject' || action === 'request_info') && !String(remarks || '').trim()) {
+      throw new AppError('Remarks are required for this action', 400);
     }
 
     const { v4: uuidv4 } = await import('uuid');

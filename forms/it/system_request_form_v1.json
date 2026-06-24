@@ -17,25 +17,9 @@
       "label": "Staff ID",
       "required": true,
       "placeholder": "e.g. 60464",
-      "width": "half",
+      "width": "full",
       "hrmsSource": "staff_id",
-      "helpText": "Enter your HRMS staff ID to load your details."
-    },
-    {
-      "id": "hrms-staff-phone",
-      "type": "phone",
-      "label": "Phone",
-      "required": true,
-      "placeholder": "e.g. 9876543210",
-      "width": "half",
-      "hrmsSource": "phone",
-      "helpText": "Registered mobile number must match HRMS records."
-    },
-    {
-      "id": "f1",
-      "type": "section_title",
-      "label": "Employee Information",
-      "width": "full"
+      "helpText": "Your staff ID — details load automatically from records."
     },
     {
       "id": "f3",
@@ -49,7 +33,7 @@
       "label": "Name",
       "required": true,
       "width": "full",
-      "placeholder": "Full name as per HRMS"
+      "placeholder": "Enter your full name"
     },
     {
       "id": "f6",

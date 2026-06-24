@@ -9,6 +9,8 @@ import { APP_NAME, DEFAULT_FORM_CATEGORY, getHrmsDepartmentTagStyle } from '../u
 import { DepartmentTag } from '../components/common/DepartmentTag';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
+import { hasAdminAccess } from '../utils/roleAccess';
+import { StaffLoginModal } from '../components/auth/StaffLoginModal';
 import type { FormSchema } from '../types';
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -72,11 +74,16 @@ function FormCard({ form, onClick }: { form: FormSchema; onClick: () => void }) 
 }
 
 export function ServiceCatalogPage() {
-  const { navigate, setSelectedForm, forms, refreshForms, error, loading } = useApp();
+  const {
+    navigate, setSelectedForm, forms, refreshForms, error, loading,
+    isEmployeeSession, employeeLogin, isAuthenticated, currentUser,
+  } = useApp();
   const routerNavigate = useNavigate();
   const [search, setSearch] = useState('');
   const [activeDepartment, setActiveDepartment] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [pendingForm, setPendingForm] = useState<FormSchema | null>(null);
 
   useEffect(() => {
     if (forms.length === 0 && !loading) {
@@ -84,6 +91,13 @@ export function ServiceCatalogPage() {
       refreshForms().finally(() => setRefreshing(false));
     }
   }, [forms.length, loading, refreshForms]);
+
+  useEffect(() => {
+    if (!isAuthenticated || !currentUser) return;
+    if (!window.location.pathname.startsWith('/admin') && hasAdminAccess(currentUser.role)) {
+      routerNavigate('/admin', { replace: true });
+    }
+  }, [isAuthenticated, currentUser, routerNavigate]);
 
   const departments = ['All', ...Array.from(new Set(forms.map(f => f.department).filter(Boolean))).sort()];
 
@@ -104,8 +118,27 @@ export function ServiceCatalogPage() {
     setSelectedForm(form);
     if (window.location.pathname.startsWith('/admin')) {
       navigate('dynamic-form');
-    } else {
+      return;
+    }
+    if (isEmployeeSession) {
       routerNavigate(`/forms/${form.id}`);
+      return;
+    }
+    setPendingForm(form);
+    setLoginOpen(true);
+  };
+
+  const handleStaffLogin = async (staffId: string, password: string) => {
+    const user = await employeeLogin(staffId, password);
+    setLoginOpen(false);
+    if (hasAdminAccess(user.role)) {
+      routerNavigate('/admin', { replace: true });
+      setPendingForm(null);
+      return;
+    }
+    if (pendingForm) {
+      routerNavigate(`/forms/${pendingForm.id}`);
+      setPendingForm(null);
     }
   };
 
@@ -119,7 +152,7 @@ export function ServiceCatalogPage() {
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
         <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Forms</h1>
         <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
-          Browse and submit {APP_NAME} forms — no login required. Your employee ID is saved locally for faster form filling.
+          Browse {APP_NAME} forms. Select a form and sign in with your staff ID and password to continue.
         </p>
       </motion.div>
 
@@ -205,6 +238,15 @@ export function ServiceCatalogPage() {
           ))}
         </div>
       )}
+      <StaffLoginModal
+        open={loginOpen}
+        onOpenChange={(open) => {
+          setLoginOpen(open);
+          if (!open) setPendingForm(null);
+        }}
+        onSubmit={handleStaffLogin}
+        formTitle={pendingForm?.title}
+      />
     </motion.div>
   );
 }
