@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ChevronLeft, Send, CheckCircle, Clock, Info, Upload,
-  Building2, AlertCircle,
+  Building2, AlertCircle, Loader2,
 } from 'lucide-react';
 import { LottiePlayer } from '../components/animations/LottiePlayer';
 import { RippleButton } from '../components/animations/RippleButton';
@@ -214,6 +214,7 @@ export function DynamicFormPage() {
   const [hrmsFound, setHrmsFound] = useState<boolean | null>(null);
   const [hrmsError, setHrmsError] = useState<string | null>(null);
   const [hrmsLoading, setHrmsLoading] = useState(false);
+  const [hrmsRefreshing, setHrmsRefreshing] = useState(false);
   const [hrmsDepartments, setHrmsDepartments] = useState<FieldOption[]>([]);
   const [hrmsDesignations, setHrmsDesignations] = useState<FieldOption[]>([]);
 
@@ -225,6 +226,24 @@ export function DynamicFormPage() {
     () => (form ? ensureStaffVerificationFields(normalizeFormFields(form.fields)) : []),
     [form],
   );
+
+  const hrmsDepartmentsRef = useRef(hrmsDepartments);
+  const hrmsDesignationsRef = useRef(hrmsDesignations);
+  hrmsDepartmentsRef.current = hrmsDepartments;
+  hrmsDesignationsRef.current = hrmsDesignations;
+
+  const isLiveHrmsEmployee = (emp: Employee) =>
+    emp.hrmsSource === 'hrms' || emp.hrmsSource === 'hrms_api';
+
+  const applyAutofill = useCallback((emp: Employee) => {
+    setHrmsFound(true);
+    setHrmsEmployee(emp);
+    const autofill = buildFormAutofill(emp, normalizedFields, {
+      departments: hrmsDepartmentsRef.current,
+      designations: hrmsDesignationsRef.current,
+    });
+    setFormData((prev) => ({ ...prev, ...autofill }));
+  }, [normalizedFields]);
 
   const staffId = getStaffIdFromAnswers(normalizedFields, formData);
   const verifyRequestRef = useRef(0);
@@ -240,30 +259,35 @@ export function DynamicFormPage() {
 
     const requestId = ++verifyRequestRef.current;
     setHrmsLoading(true);
+    setHrmsRefreshing(false);
     setHrmsError(null);
 
     try {
-      const emp = await fetchEmployee(normalizedId);
+      const emp = await fetchEmployee(normalizedId, undefined, (updated) => {
+        if (requestId !== verifyRequestRef.current) return;
+        applyAutofill(updated);
+        if (isLiveHrmsEmployee(updated)) setHrmsRefreshing(false);
+      });
       if (requestId !== verifyRequestRef.current) return;
       if (!emp) {
         setHrmsFound(false);
         setHrmsEmployee(null);
         setHrmsError('Employee not found');
+        setHrmsRefreshing(false);
         return;
       }
-      setHrmsFound(true);
-      setHrmsEmployee(emp);
-      const autofill = buildFormAutofill(emp, normalizedFields);
-      setFormData(prev => ({ ...prev, ...autofill }));
+      applyAutofill(emp);
+      setHrmsRefreshing(!isLiveHrmsEmployee(emp));
     } catch (err) {
       if (requestId !== verifyRequestRef.current) return;
       setHrmsFound(false);
       setHrmsEmployee(null);
+      setHrmsRefreshing(false);
       setHrmsError(sanitizeUserFacingText(err instanceof Error ? err.message : 'Failed to load employee details'));
     } finally {
       if (requestId === verifyRequestRef.current) setHrmsLoading(false);
     }
-  }, [fetchEmployee, normalizedFields]);
+  }, [fetchEmployee, applyAutofill]);
 
   useEffect(() => {
     if (isPublicForm && form) {
@@ -337,6 +361,11 @@ export function DynamicFormPage() {
       .then(res => setHrmsDesignations(res.data.map(d => ({ label: d.name, value: String(d.id) }))))
       .catch(() => setHrmsDesignations([]));
   }, [selectedDepartmentId]);
+
+  useEffect(() => {
+    if (!hrmsEmployee) return;
+    applyAutofill(hrmsEmployee);
+  }, [hrmsEmployee, hrmsDepartments, hrmsDesignations, applyAutofill]);
 
   if (!form) {
     if (isPublicForm) {
@@ -551,6 +580,14 @@ export function DynamicFormPage() {
       {/* Form Fields */}
       <Card className="border-border/60 shadow-sm">
         <CardContent className="pt-6">
+          {(hrmsLoading || hrmsRefreshing) && (
+            <div className="flex items-center gap-2 mb-4 px-3 py-2 rounded-lg bg-primary/5 border border-primary/15 text-primary">
+              <Loader2 className="size-4 animate-spin shrink-0" />
+              <p style={{ fontSize: '12px' }}>
+                {hrmsLoading ? 'Loading your details…' : 'Fetching full details from HRMS…'}
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-x-4 gap-y-5">
             {normalizedFields.map((field) => (
               <FormFieldRenderer

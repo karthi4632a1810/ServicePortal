@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense, lazy } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router';
 import { Toaster } from 'sonner';
@@ -15,14 +15,24 @@ import { EmployeePortalPage } from './pages/EmployeePortalPage';
 import { ServiceCatalogPage } from './pages/ServiceCatalogPage';
 import { DynamicFormPage } from './pages/DynamicFormPage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
+import { MyTasksPage } from './pages/MyTasksPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
-import { WorkflowPipelinePage } from './pages/WorkflowPipelinePage';
-import { WorkQueuePage } from './pages/WorkQueuePage';
-import { FormBuilderPage } from './pages/FormBuilderPage';
-import { AuditLogPage } from './pages/AuditLogPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { UserManagementPage } from './pages/UserManagementPage';
+
+const WorkflowPipelinePage = lazy(() => import('./pages/WorkflowPipelinePage').then(m => ({ default: m.WorkflowPipelinePage })));
+const WorkQueuePage = lazy(() => import('./pages/WorkQueuePage').then(m => ({ default: m.WorkQueuePage })));
+const FormBuilderPage = lazy(() => import('./pages/FormBuilderPage').then(m => ({ default: m.FormBuilderPage })));
+const AuditLogPage = lazy(() => import('./pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
+const UserManagementPage = lazy(() => import('./pages/UserManagementPage').then(m => ({ default: m.UserManagementPage })));
+
+function PageFallback() {
+  return (
+    <div className="flex-1 flex items-center justify-center p-12">
+      <div className="size-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+    </div>
+  );
+}
 
 const PAGE_VARIANTS = {
   initial: { opacity: 0, y: 16, filter: 'blur(3px)' },
@@ -46,19 +56,25 @@ function PageRouter() {
   }, [currentPage, currentUser, navigate]);
 
   const renderPage = () => {
+    const lazyPage = (el: React.ReactNode) => (
+      <Suspense fallback={<PageFallback />}>{el}</Suspense>
+    );
+
     switch (currentPage) {
       case 'dashboard':       return <DashboardPage />;
       case 'employee-portal': return <EmployeePortalPage />;
       case 'service-catalog': return <ServiceCatalogPage />;
       case 'dynamic-form':    return <DynamicFormPage />;
       case 'my-requests':     return <MyRequestsPage />;
+      case 'my-tasks':        return <MyTasksPage />;
       case 'request-detail':  return <RequestDetailPage />;
-      case 'approvals':            return <ApprovalsPage />;
-      case 'workflow-pipeline':    return <WorkflowPipelinePage />;
-      case 'work-queue':           return <WorkQueuePage />;
-      case 'form-builder':    return <FormBuilderPage />;
-      case 'audit-log':       return <AuditLogPage />;
-      case 'user-management': return <UserManagementPage />;
+      case 'approvals':            return <ApprovalsPage variant="approval" />;
+      case 'accept':                 return <ApprovalsPage variant="accept" />;
+      case 'workflow-pipeline':    return lazyPage(<WorkflowPipelinePage />);
+      case 'work-queue':           return lazyPage(<WorkQueuePage />);
+      case 'form-builder':    return lazyPage(<FormBuilderPage />);
+      case 'audit-log':       return lazyPage(<AuditLogPage />);
+      case 'user-management': return lazyPage(<UserManagementPage />);
       case 'settings':        return <SettingsPage />;
       default:                return <DashboardPage />;
     }

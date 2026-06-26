@@ -11,6 +11,7 @@ import { getAccessTier } from '../utils/roleAccess';
 import { api } from '../services/api';
 import type { Employee, Request } from '../types';
 import { getEmployeeProfileFields } from '../utils/employeeProfileFields';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const STATUS_CONFIG: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
@@ -147,10 +148,13 @@ export function EmployeePortalPage() {
   const [isLoadingSelf, setIsLoadingSelf] = useState(false);
   const [error, setError] = useState('');
 
-  const loadEmployeeData = useCallback(async (id: string) => {
-    const emp = await fetchEmployee(id);
+  const loadEmployeeData = useCallback(async (id: string, onEmployeeUpdate?: (emp: Employee) => void) => {
+    const requestsPromise = api.getEmployeeRequests(id);
+    const emp = await fetchEmployee(id, undefined, (updated) => {
+      onEmployeeUpdate?.(updated);
+    });
     if (!emp) return null;
-    const res = await api.getEmployeeRequests(id);
+    const res = await requestsPromise;
     return { emp, reqs: res.data };
   }, [fetchEmployee]);
 
@@ -159,7 +163,7 @@ export function EmployeePortalPage() {
     setIsLoadingSelf(true);
     setError('');
     try {
-      const result = await loadEmployeeData(currentUser.employeeId);
+      const result = await loadEmployeeData(currentUser.employeeId, setFoundEmployee);
       if (!result) return;
       setFoundEmployee(result.emp);
       setEmployeeRequests(result.reqs);
@@ -176,6 +180,35 @@ export function EmployeePortalPage() {
     if (!isEmployeeView) return;
     void loadSelf();
   }, [isEmployeeView, loadSelf]);
+
+  const refreshPortalData = useCallback(async () => {
+    if (isEmployeeView) {
+      await loadSelf();
+      return;
+    }
+    const id = foundEmployee?.employeeId ?? employeeId.trim();
+    if (!id) return;
+    setIsSearching(true);
+    setError('');
+    try {
+      const result = await loadEmployeeData(id, setFoundEmployee);
+      if (!result) {
+        setFoundEmployee(null);
+        setEmployeeRequests([]);
+        return;
+      }
+      setFoundEmployee(result.emp);
+      setEmployeeRequests(result.reqs);
+    } catch (err) {
+      setFoundEmployee(null);
+      setEmployeeRequests([]);
+      setError(err instanceof Error ? err.message : 'Failed to refresh employee data.');
+    } finally {
+      setIsSearching(false);
+    }
+  }, [isEmployeeView, loadSelf, foundEmployee?.employeeId, employeeId, loadEmployeeData]);
+
+  useScreenRefresh(refreshPortalData);
 
   useEffect(() => {
     if (isEmployeeView && requests.length > 0) {
@@ -196,7 +229,7 @@ export function EmployeePortalPage() {
     setIsSearching(true);
     setError('');
     try {
-      const result = await loadEmployeeData(id);
+      const result = await loadEmployeeData(id, setFoundEmployee);
       if (!result) return;
       if (currentUser?.role === 'hod' && !departmentsMatch(currentUser.department, result.emp.department)) {
         setFoundEmployee(null);

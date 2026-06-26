@@ -1,5 +1,25 @@
-import type { Employee, FormField } from '../types';
+import type { Employee, FormField, FieldOption } from '../types';
 import { getEffectiveHrmsSource } from './hrmsFormFields';
+
+export type AutofillMasterOptions = {
+  departments?: FieldOption[];
+  designations?: FieldOption[];
+};
+
+function normalizeName(s: string): string {
+  return s.toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+function findOptionIdByName(options: FieldOption[], name: string): string | undefined {
+  if (!name?.trim() || !options?.length) return undefined;
+  const n = normalizeName(name);
+  const exact = options.find((o) => normalizeName(o.label) === n);
+  if (exact) return exact.value;
+  const partial = options.find(
+    (o) => normalizeName(o.label).includes(n) || n.includes(normalizeName(o.label)),
+  );
+  return partial?.value;
+}
 
 function normLabel(label: string): string {
   return label.toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ').trim();
@@ -103,6 +123,7 @@ const SKIPPED_TYPES = new Set([
 export function buildFormAutofill(
   employee: Employee,
   fields: FormField[],
+  masterOptions?: AutofillMasterOptions,
 ): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
@@ -113,9 +134,11 @@ export function buildFormAutofill(
     let value: unknown;
 
     if (getEffectiveHrmsSource(field) === 'department') {
-      value = employee.departmentId;
+      value = employee.departmentId
+        || findOptionIdByName(masterOptions?.departments ?? [], employee.department ?? '');
     } else if (getEffectiveHrmsSource(field) === 'designation') {
-      value = employee.designationId;
+      value = employee.designationId
+        || findOptionIdByName(masterOptions?.designations ?? [], employee.designation ?? '');
     } else if (getEffectiveHrmsSource(field) === 'phone') {
       value = employee.mobile;
     } else {

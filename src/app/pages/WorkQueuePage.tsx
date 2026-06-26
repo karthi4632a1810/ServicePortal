@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import {
   Layers, Clock, CheckCircle, XCircle, Loader2,
@@ -7,8 +7,9 @@ import {
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
-type QueueStatus = 'pending' | 'in_progress' | 'completed' | 'cancelled';
+type QueueStatus = 'pending' | 'in_progress' | 'pending_hod_review' | 'completed' | 'cancelled';
 
 interface QueueItem {
   id: string;
@@ -26,13 +27,14 @@ interface QueueItem {
 const STATUS_CONFIG: Record<QueueStatus, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   pending: { label: 'Pending', icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50 dark:bg-amber-950' },
   in_progress: { label: 'In Progress', icon: Loader2, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
+  pending_hod_review: { label: 'Awaiting Confirmation', icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50 dark:bg-purple-950' },
   completed: { label: 'Completed', icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-950' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800' },
 };
 
 function KanbanColumn({ title, items, status, color, onStatusChange, updating }: {
   title: string; items: QueueItem[]; status: QueueStatus; color: string;
-  onStatusChange: (id: string, newStatus: QueueStatus) => void;
+  onStatusChange: (id: string, newStatus: QueueStatus | 'finish') => void;
   updating: string | null;
 }) {
   return (
@@ -91,11 +93,11 @@ function KanbanColumn({ title, items, status, color, onStatusChange, updating }:
                 {item.queueStatus === 'in_progress' && (
                   <button
                     disabled={isUpdating}
-                    onClick={() => onStatusChange(item.id, 'completed')}
+                    onClick={() => onStatusChange(item.id, 'finish')}
                     className="flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-600 text-white hover:opacity-90 transition-opacity disabled:opacity-50"
                     style={{ fontSize: '10px' }}
                   >
-                    <Check className="size-2.5" /> Done
+                    <Check className="size-2.5" /> Finish
                   </button>
                 )}
               </div>
@@ -119,35 +121,50 @@ export function WorkQueuePage() {
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function load() {
-      setLoading(true);
-      try {
-        const res = await api.getDepartmentQueue('IT');
-        setItems(res.data as unknown as QueueItem[]);
-      } catch {
-        setItems([]);
-      } finally {
-        setLoading(false);
-      }
+  const loadQueue = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await api.getDepartmentQueue('IT');
+      setItems(res.data as unknown as QueueItem[]);
+    } catch {
+      setItems([]);
+    } finally {
+      setLoading(false);
     }
-    load();
   }, []);
 
-  const handleStatusChange = async (id: string, newStatus: QueueStatus) => {
+  useEffect(() => {
+    void loadQueue();
+  }, [loadQueue]);
+
+  useScreenRefresh(loadQueue);
+
+  const handleStatusChange = async (id: string, newStatus: QueueStatus | 'finish') => {
     setUpdating(id);
     try {
-      const res = await api.updateQueueStatus(id, { queueStatus: newStatus });
-      const updated = res.data;
-      setItems(prev => prev.map(item =>
-        item.id === id
-          ? {
-              ...item,
-              queueStatus: (updated.queueStatus as QueueStatus) || newStatus,
-              assignedTo: updated.assignedTo || item.assignedTo,
-            }
-          : item
-      ));
+      if (newStatus === 'finish') {
+        const remarks = window.prompt('Describe what was done (required):');
+        if (!remarks?.trim()) return;
+        const res = await api.submitForReview(id, remarks.trim());
+        const updated = res.data;
+        setItems(prev => prev.map(item =>
+          item.id === id
+            ? { ...item, queueStatus: (updated.queueStatus as QueueStatus) || 'pending_hod_review' }
+            : item
+        ));
+      } else {
+        const res = await api.updateQueueStatus(id, { queueStatus: newStatus });
+        const updated = res.data;
+        setItems(prev => prev.map(item =>
+          item.id === id
+            ? {
+                ...item,
+                queueStatus: (updated.queueStatus as QueueStatus) || newStatus,
+                assignedTo: updated.assignedTo || item.assignedTo,
+              }
+            : item
+        ));
+      }
       await refreshRequests();
     } catch {
       // keep UI unchanged on failure
@@ -201,6 +218,14 @@ export function WorkQueuePage() {
             items={byStatus('in_progress')}
             status="in_progress"
             color="bg-blue-50 dark:bg-blue-950/50"
+            onStatusChange={handleStatusChange}
+            updating={updating}
+          />
+          <KanbanColumn
+            title="Awaiting Confirmation"
+            items={byStatus('pending_hod_review')}
+            status="pending_hod_review"
+            color="bg-purple-50 dark:bg-purple-950/50"
             onStatusChange={handleStatusChange}
             updating={updating}
           />

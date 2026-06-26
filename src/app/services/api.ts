@@ -134,6 +134,16 @@ class ApiClient {
     return this.request<import('../types').Employee>(`/hrms/employee/${employeeId}${qs}`);
   }
 
+  getEmployeeFast(employeeId: string) {
+    return this.request<import('../types').Employee>(`/hrms/employee/${employeeId}?fast=1`);
+  }
+
+  getEmployeeLive(employeeId: string, phone?: string) {
+    const params = new URLSearchParams({ live: '1' });
+    if (phone) params.set('phone', phone);
+    return this.request<import('../types').Employee>(`/hrms/employee/${employeeId}?${params}`);
+  }
+
   getDepartments() {
     return this.request<Array<{ id: number; name: string }>>('/hrms/departments');
   }
@@ -198,8 +208,48 @@ class ApiClient {
     return this.request<import('../types').Request>('/requests', { method: 'POST', body: JSON.stringify(data) });
   }
 
-  updateQueueStatus(id: string, data: { queueStatus: string; assignedTo?: string }) {
+  updateQueueStatus(id: string, data: { queueStatus: string; assignedTo?: string; assignedToUserId?: string }) {
     return this.request<import('../types').Request>(`/requests/${id}/queue`, { method: 'PATCH', body: JSON.stringify(data) });
+  }
+
+  assignRequest(id: string, staffIds: string | string[]) {
+    const body = Array.isArray(staffIds) ? { staffIds } : { staffId: staffIds };
+    return this.request<import('../types').Request>(`/requests/${id}/assign`, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    });
+  }
+
+  acceptProcessing(id: string, remarks?: string) {
+    return this.request<import('../types').Request>(`/requests/${id}/accept-processing`, {
+      method: 'POST',
+      body: JSON.stringify({ remarks }),
+    });
+  }
+
+  getAssignedTasks() {
+    return this.request<import('../types').MyTask[]>('/requests/assigned-to-me');
+  }
+
+  submitForReview(id: string, remarks: string) {
+    return this.request<import('../types').Request>(`/requests/${id}/submit-for-review`, {
+      method: 'POST',
+      body: JSON.stringify({ remarks }),
+    });
+  }
+
+  confirmCompletion(id: string, remarks?: string) {
+    return this.request<import('../types').Request>(`/requests/${id}/confirm-completion`, {
+      method: 'POST',
+      body: JSON.stringify({ remarks }),
+    });
+  }
+
+  sendBackForRework(id: string, remarks: string) {
+    return this.request<import('../types').Request>(`/requests/${id}/send-back-rework`, {
+      method: 'POST',
+      body: JSON.stringify({ remarks }),
+    });
   }
 
   // Approvals
@@ -215,8 +265,11 @@ class ApiClient {
     return this.request<import('../types').Request>(`/approvals/${id}/reject`, { method: 'POST', body: JSON.stringify({ remarks }) });
   }
 
-  forwardRequest(id: string, remarks?: string) {
-    return this.request<import('../types').Request>(`/approvals/${id}/forward`, { method: 'POST', body: JSON.stringify({ remarks }) });
+  forwardRequest(id: string, staffId: string, remarks?: string) {
+    return this.request<import('../types').Request>(`/approvals/${id}/forward`, {
+      method: 'POST',
+      body: JSON.stringify({ staffId, remarks }),
+    });
   }
 
   requestInfo(id: string, remarks?: string) {

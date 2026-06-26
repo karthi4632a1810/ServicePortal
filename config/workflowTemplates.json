@@ -5,7 +5,7 @@
     "description": "Employee HOD approval followed by owning department processing",
     "steps": [
       { "name": "HOD Approval", "type": "hod" },
-      { "name": "Department Processing", "type": "department_processor" }
+      { "name": "Department Handling", "type": "department_processor" }
     ]
   },
   {

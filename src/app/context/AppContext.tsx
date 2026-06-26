@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import type { Page, Approver, Request, FormSchema, AuditLog, DashboardStats, Employee } from '../types';
 
 import { api } from '../services/api';
+import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
 import { getDefaultPage, DEMO_ACCOUNTS, hasAdminAccess, isEmployeeSession as isEmployeeRole } from '../utils/roleAccess';
 import {
   DEFAULT_PREFERENCES,
@@ -124,15 +125,25 @@ interface AppContextValue {
 
   refreshForms: () => Promise<void>;
 
-  fetchEmployee: (employeeId: string, phone?: string) => Promise<Employee | null>;
+  fetchEmployee: (employeeId: string, phone?: string, onUpdate?: (employee: Employee) => void) => Promise<Employee | null>;
 
   submitRequest: (data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string }) => Promise<Request>;
 
-  performApprovalAction: (id: string, action: 'approve' | 'reject' | 'forward' | 'request-info', remarks?: string) => Promise<Request>;
+  performApprovalAction: (id: string, action: 'approve' | 'reject' | 'forward' | 'request-info', remarks?: string, staffId?: string) => Promise<Request>;
 
   updateRequest: (updated: Request) => void;
 
   apiLoginUsers: Approver[];
+
+  screenRefreshing: boolean;
+
+  refreshScreen: () => Promise<void>;
+
+  registerScreenRefresh: (handler: (() => void | Promise<void>) | null) => void;
+
+  loadDashboard: () => Promise<void>;
+
+  loadAuditLogs: () => Promise<void>;
 
 }
 
@@ -188,6 +199,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
+
+  const screenRefreshRef = useRef<(() => void | Promise<void>) | null>(null);
+  const [screenRefreshing, setScreenRefreshing] = useState(false);
+
+  const registerScreenRefresh = useCallback((handler: (() => void | Promise<void>) | null) => {
+    screenRefreshRef.current = handler;
+  }, []);
+
+  const refreshScreen = useCallback(async () => {
+    const handler = screenRefreshRef.current;
+    if (!handler) return;
+    setScreenRefreshing(true);
+    try {
+      await handler();
+    } finally {
+      setScreenRefreshing(false);
+    }
+  }, []);
 
   const refreshForms = useCallback(async () => {
 
@@ -260,51 +289,30 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const performApprovalAction = useCallback(async (
-
     id: string,
-
     action: 'approve' | 'reject' | 'forward' | 'request-info',
-
     remarks?: string,
-
+    staffId?: string,
   ) => {
-
     let res;
-
     switch (action) {
-
       case 'approve':
-
         res = await api.approveRequest(id, remarks);
-
         break;
-
       case 'reject':
-
         res = await api.rejectRequest(id, remarks);
-
         break;
-
       case 'forward':
-
-        res = await api.forwardRequest(id, remarks);
-
+        if (!staffId?.trim()) throw new Error('Staff ID is required to forward');
+        res = await api.forwardRequest(id, staffId.trim(), remarks);
         break;
-
       case 'request-info':
-
         res = await api.requestInfo(id, remarks);
-
         break;
-
     }
-
     updateRequest(res.data);
-
     await Promise.allSettled([refreshRequests(), loadDashboard()]);
-
     return res.data;
-
   }, [updateRequest, loadDashboard, refreshRequests]);
 
 
@@ -324,12 +332,6 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       const errors: string[] = [];
 
       try {
-        await refreshForms();
-      } catch (err) {
-        errors.push(err instanceof Error ? err.message : 'Failed to load service catalog');
-      }
-
-      try {
         const token = api.getToken();
         if (token) {
           try {
@@ -341,23 +343,25 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setCurrentPage(getDefaultPage(me.data.role));
             applyPreferences(me.data.preferences ?? DEFAULT_PREFERENCES);
 
+            void refreshForms().catch((err) => {
+              console.warn('Forms load failed:', err);
+            });
+
             if (me.data.role === 'employee' && me.data.employeeId) {
-              await refreshRequests(me.data);
+              void refreshRequests(me.data);
             } else {
-              const results = await Promise.allSettled([
+              void Promise.allSettled([
                 refreshRequests(me.data),
                 loadDashboard(),
                 loadAuditLogs(),
               ]);
-              for (const result of results) {
-                if (result.status === 'rejected') {
-                  errors.push(result.reason instanceof Error ? result.reason.message : 'API request failed');
-                }
-              }
             }
           } catch {
             api.setToken(null);
+            await refreshForms();
           }
+        } else {
+          await refreshForms();
         }
       } catch (err) {
         errors.push(err instanceof Error ? err.message : 'Failed to connect to API');
@@ -414,12 +418,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentPage(getDefaultPage(user.role));
     applyPreferences(user.preferences ?? DEFAULT_PREFERENCES);
 
-    await refreshForms();
+    void refreshForms();
     if (user.role === 'employee' && user.employeeId) {
-      const empReqs = await api.getEmployeeRequests(user.employeeId);
-      setRequests(empReqs.data);
+      void api.getEmployeeRequests(user.employeeId).then((empReqs) => {
+        setRequests(empReqs.data);
+      }).catch(() => {});
     } else {
-      await Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
+      void Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
     }
   }, [refreshRequests, loadDashboard, loadAuditLogs, refreshForms, applyPreferences]);
 
@@ -432,12 +437,13 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentPage(getDefaultPage(user.role));
     applyPreferences(user.preferences ?? DEFAULT_PREFERENCES);
 
-    await refreshForms();
+    void refreshForms();
     if (user.role === 'employee' && user.employeeId) {
-      const empReqs = await api.getEmployeeRequests(user.employeeId);
-      setRequests(empReqs.data);
+      void api.getEmployeeRequests(user.employeeId).then((empReqs) => {
+        setRequests(empReqs.data);
+      }).catch(() => {});
     } else if (hasAdminAccess(user.role) || user.role !== 'employee') {
-      await Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
+      void Promise.allSettled([refreshRequests(user), loadDashboard(), loadAuditLogs()]);
     }
     return user;
   }, [applyPreferences, refreshForms, refreshRequests, loadDashboard, loadAuditLogs]);
@@ -461,13 +467,11 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
 
-  const fetchEmployee = useCallback(async (employeeId: string, phone?: string) => {
-
-    const res = await api.getEmployee(employeeId, phone);
-
-    return res.data;
-
-  }, []);
+  const fetchEmployee = useCallback(async (
+    employeeId: string,
+    phone?: string,
+    onUpdate?: (employee: Employee) => void,
+  ) => fetchEmployeeTiered(employeeId, phone, onUpdate), []);
 
 
 
@@ -591,6 +595,15 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
       apiLoginUsers: DEMO_LOGIN_USERS,
 
+      screenRefreshing,
+
+      refreshScreen,
+
+      registerScreenRefresh,
+
+      loadDashboard,
+
+      loadAuditLogs,
     }}>
 
       {children}

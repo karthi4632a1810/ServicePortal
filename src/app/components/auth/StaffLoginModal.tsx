@@ -9,7 +9,7 @@ import {
 import { RippleButton } from '../animations/RippleButton';
 import { PasswordInput } from '../ui/password-input';
 import { UserAvatar } from '../ui/user-avatar';
-import { api } from '../../services/api';
+import { fetchEmployeeTiered } from '../../utils/fetchEmployeeTiered';
 import type { Employee } from '../../types';
 
 function staffInitials(name: string) {
@@ -71,25 +71,22 @@ export function StaffLoginModal({ open, onOpenChange, onSubmit, formTitle }: Sta
 
     if (id === lastVerifiedId.current && employee?.id === id) return;
 
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
       setVerifying(true);
       setVerifyError('');
       setLoginError('');
-      setEmployee(null);
-      setPassword('');
-
-      try {
-        const res = await api.getEmployee(id);
-        setEmployee(res.data);
-        lastVerifiedId.current = id;
-      } catch (err) {
-        setEmployee(null);
-        lastVerifiedId.current = '';
-        setVerifyError(err instanceof Error ? err.message : 'Staff ID not found');
-      } finally {
+      void fetchEmployeeTiered(id, undefined, setEmployee).then((emp) => {
+        if (staffId.trim() !== id) return;
+        if (emp) {
+          lastVerifiedId.current = id;
+        } else {
+          setEmployee(null);
+          lastVerifiedId.current = '';
+          setVerifyError('Staff ID not found in HRMS — you can still try signing in');
+        }
         setVerifying(false);
-      }
-    }, 500);
+      });
+    }, 400);
 
     return () => window.clearTimeout(timer);
   }, [staffId]);
@@ -106,12 +103,13 @@ export function StaffLoginModal({ open, onOpenChange, onSubmit, formTitle }: Sta
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!employee || !password) return;
+    const id = staffId.trim();
+    if (!id || !password) return;
 
     setLoginError('');
     setLoggingIn(true);
     try {
-      await onSubmit(employee.id, password);
+      await onSubmit(id, password);
       reset();
     } catch (err) {
       setLoginError(err instanceof Error ? err.message : 'Login failed');
@@ -120,7 +118,7 @@ export function StaffLoginModal({ open, onOpenChange, onSubmit, formTitle }: Sta
     }
   };
 
-  const passwordEnabled = Boolean(employee) && !verifying;
+  const passwordEnabled = Boolean(staffId.trim()) && !verifying;
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>

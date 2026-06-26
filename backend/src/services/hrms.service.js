@@ -8,6 +8,23 @@ import {
   normalizePhone,
   phoneMatchesRow,
 } from '../utils/hrmsMapper.js';
+import { getInitials } from '../utils/helpers.js';
+import { getHrmsCache, setHrmsCache } from '../utils/hrmsCache.js';
+
+const HRMS_LOOKUP_TIMEOUT_MS = 5000;
+
+function withHrmsSource(employee, source) {
+  return { ...employee, hrmsSource: source };
+}
+
+function raceWithTimeout(promise, ms = HRMS_LOOKUP_TIMEOUT_MS) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('HRMS lookup timeout')), ms);
+    }),
+  ]);
+}
 
 function formatDbError(err) {
   if (err.message) return err.message;
@@ -225,7 +242,55 @@ export class HrmsService {
     return enriched;
   }
 
+  async getEmployeeFromPortalCache(staffId) {
+    const id = String(staffId || '').trim();
+    if (!id) return null;
+
+    const User = (await import('../models/User.js')).default;
+    const Request = (await import('../models/Request.js')).default;
+
+    const user = await User.findOne({
+      $or: [{ employeeId: id }, { email: `${id.toLowerCase()}@portal.local` }],
+      active: true,
+    }).lean();
+
+    if (user) {
+      return withHrmsSource(normalizeEmployee({
+        id,
+        name: user.name,
+        department: user.department,
+        designation: user.designation || '',
+        email: user.email,
+        branch: user.department,
+        reportingManager: '',
+        hod: '',
+        status: 'active',
+        avatar: user.avatar || user.initials || getInitials(user.name),
+      }), 'portal_user');
+    }
+
+    const latestRequest = await Request.findOne({ 'employee.id': id })
+      .sort('-submittedAt')
+      .select('employee')
+      .lean();
+
+    if (latestRequest?.employee?.id) {
+      return withHrmsSource(normalizeEmployee({
+        ...latestRequest.employee,
+        id: latestRequest.employee.id,
+      }), 'request_snapshot');
+    }
+
+    return null;
+  }
+
   async getEmployeeFromDb(staffId, phone) {
+    const cacheKey = phone ? null : `hrms:emp:${staffId}`;
+    if (cacheKey) {
+      const hit = getHrmsCache(cacheKey);
+      if (hit) return hit;
+    }
+
     const table = config.hrms.db.table;
     const rows = await queryHrms(
       `SELECT * FROM \`${table}\` WHERE staff_id = ? LIMIT 1`,
@@ -250,10 +315,13 @@ export class HrmsService {
 
     const mapped = mapStaffRow(row);
     const employee = normalizeEmployee(mapped);
-    return this.enrichMasterLookups(employee);
+    const enriched = await this.enrichMasterLookups(employee);
+    const result = withHrmsSource(enriched, 'hrms');
+    if (cacheKey) setHrmsCache(cacheKey, result);
+    return result;
   }
 
-  async getEmployee(employeeId, phone) {
+  async getEmployeeLive(employeeId, phone) {
     const normalizedId = employeeId.trim();
     if (!normalizedId) {
       throw new AppError('Employee ID is required', 400);
@@ -280,7 +348,7 @@ export class HrmsService {
         );
         if (response.ok) {
           const data = await response.json();
-          return normalizeEmployee(data.data || data);
+          return withHrmsSource(normalizeEmployee(data.data || data), 'hrms_api');
         }
       } catch (err) {
         console.warn('HRMS API unavailable:', err.message);
@@ -288,6 +356,45 @@ export class HrmsService {
     }
 
     throw new AppError(`Employee not found: ${normalizedId}`, 404);
+  }
+
+  async resolveEmployeeDepartment(staffId) {
+    const cached = await this.getEmployeeFromPortalCache(staffId);
+    if (cached?.department) return cached.department;
+    const live = await this.getEmployeeLive(staffId);
+    return live.department;
+  }
+
+  async getEmployee(employeeId, phone, { mode = 'auto' } = {}) {
+    const normalizedId = String(employeeId || '').trim();
+    if (!normalizedId) {
+      throw new AppError('Employee ID is required', 400);
+    }
+
+    if (mode === 'cache') {
+      const cached = await this.getEmployeeFromPortalCache(normalizedId);
+      if (!cached) throw new AppError(`Employee not found: ${normalizedId}`, 404);
+      return cached;
+    }
+
+    if (phone || mode === 'live') {
+      return this.getEmployeeLive(normalizedId, phone);
+    }
+
+    const cached = await this.getEmployeeFromPortalCache(normalizedId);
+
+    if (!isHrmsDbConfigured() && !config.hrms.apiUrl) {
+      if (cached) return cached;
+      throw new AppError(`Employee not found: ${normalizedId}`, 404);
+    }
+
+    try {
+      return await raceWithTimeout(this.getEmployeeLive(normalizedId));
+    } catch (err) {
+      if (cached) return withHrmsSource(cached, 'portal_cache_fallback');
+      if (err instanceof AppError) throw err;
+      throw new AppError(`Employee not found: ${normalizedId}`, 404);
+    }
   }
 }
 

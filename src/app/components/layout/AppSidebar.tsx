@@ -4,13 +4,14 @@ import { useNavigate } from 'react-router';
 import {
   LayoutDashboard, User, LayoutGrid, FileText, CheckSquare,
   Layers, Wrench, Shield, Settings, ChevronLeft, ChevronRight,
-  ClipboardList, LogOut, GitBranch, Users,
+  ClipboardList, LogOut, GitBranch, Users, ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { UserAvatar } from '../ui/user-avatar';
 import { useApp } from '../../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 import { canAccessPage } from '../../utils/roleAccess';
+import { isPipelineRequest } from '../../utils/mapRequestToWorkflow';
 import type { Page } from '../../types';
 
 interface NavItem {
@@ -25,7 +26,9 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'employee-portal', label: 'Employee Portal', icon: User, dividerBefore: true },
   { id: 'service-catalog', label: 'Form Catalog', icon: LayoutGrid },
   { id: 'my-requests', label: 'My Requests', icon: FileText },
+  { id: 'my-tasks', label: 'My Tasks', icon: ClipboardList },
   { id: 'approvals', label: 'Approvals', icon: CheckSquare },
+  { id: 'accept', label: 'Accept', icon: ClipboardCheck },
   { id: 'workflow-pipeline', label: 'Workflow Pipeline', icon: GitBranch },
   { id: 'work-queue', label: 'Work Queue', icon: Layers },
   { id: 'form-builder', label: 'Form Builder', icon: Wrench, dividerBefore: true },
@@ -34,10 +37,50 @@ const NAV_ITEMS: NavItem[] = [
   { id: 'settings', label: 'Settings', icon: Settings },
 ];
 
-function useNavBadges(requests: import('../../types').Request[]): Partial<Record<Page, number>> {
+function departmentsMatch(a?: string, b?: string) {
+  if (!a || !b) return false;
+  const na = a.toLowerCase().replace(/\s+/g, ' ').trim();
+  const nb = b.toLowerCase().replace(/\s+/g, ' ').trim();
+  return na === nb || na.includes(nb) || nb.includes(na);
+}
+
+function useNavBadges(
+  requests: import('../../types').Request[],
+  currentUser: import('../../types').Approver | null,
+): Partial<Record<Page, number>> {
+  const approvalSteps = new Set(['hod', 'reporting_manager', 'specific_user', 'specific_role', 'parallel']);
+  const empId = String(currentUser?.employeeId || '').trim();
+
+  const myTasks = requests.filter((r) => {
+    if (r.status !== 'processing') return false;
+    if (r.queueStatus === 'pending_hod_review' && currentUser?.role === 'hod') {
+      return departmentsMatch(currentUser.department, r.department);
+    }
+    if (['pending', 'in_progress'].includes(r.queueStatus || '')) {
+      return r.assignees?.some((a) => a.employeeId === empId)
+        || r.assignedToEmployeeId === empId;
+    }
+    return false;
+  }).length;
+
   return {
-    approvals: requests.filter(r => r.status === 'pending_approval').length,
-    'workflow-pipeline': requests.filter(r => !['completed', 'rejected', 'cancelled'].includes(r.status)).length,
+    approvals: requests.filter((r) => {
+      const step = r.workflow[r.currentStep - 1];
+      if (r.queueStatus === 'pending_hod_review') return false;
+      return r.status === 'pending_approval'
+        && step?.status === 'pending'
+        && approvalSteps.has(step.type);
+    }).length,
+    accept: requests.filter((r) => {
+      const step = r.workflow[r.currentStep - 1];
+      return step?.type === 'department_processor'
+        && !(r.receiverAcceptedBy || r.receiverApprovedBy)
+        && r.status === 'processing'
+        && currentUser?.role === 'hod'
+        && departmentsMatch(currentUser.department, r.department);
+    }).length,
+    'my-tasks': myTasks,
+    'workflow-pipeline': requests.filter((r) => isPipelineRequest(r) && !['completed', 'rejected', 'cancelled'].includes(r.status)).length,
     'work-queue': requests.filter(r => ['approved', 'processing'].includes(r.status)).length,
   };
 }
@@ -45,7 +88,7 @@ function useNavBadges(requests: import('../../types').Request[]): Partial<Record
 export function AppSidebar() {
   const { currentPage, navigate, isSidebarCollapsed, toggleSidebar, currentUser, logout, requests } = useApp();
   const routerNavigate = useNavigate();
-  const badges = useNavBadges(requests);
+  const badges = useNavBadges(requests, currentUser);
   const visibleItems = NAV_ITEMS.filter(item =>
     currentUser ? canAccessPage(currentUser.role, item.id) : false
   );

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bell, Sun, Moon, ChevronRight, X } from 'lucide-react';
+import { Search, Bell, Sun, Moon, ChevronRight, X, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn } from '../ui/utils';
 import { UserAvatar } from '../ui/user-avatar';
@@ -11,8 +11,10 @@ const PAGE_LABELS: Record<string, string> = {
   'service-catalog': 'Form Catalog',
   'dynamic-form': 'Submit Request',
   'my-requests': 'My Requests',
+  'my-tasks': 'My Tasks',
   'request-detail': 'Request Details',
   'approvals': 'Approvals',
+  'accept': 'Accept',
   'workflow-pipeline': 'Workflow Pipeline',
   'work-queue': 'Work Queue',
   'form-builder': 'Form Builder',
@@ -27,7 +29,7 @@ const BREADCRUMB_PARENTS: Record<string, string[]> = {
 };
 
 export function AppHeader() {
-  const { currentPage, navigate, isDark, toggleDark, searchQuery, setSearchQuery, currentUser } = useApp();
+  const { currentPage, navigate, isDark, toggleDark, searchQuery, setSearchQuery, currentUser, refreshScreen, screenRefreshing } = useApp();
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
@@ -95,6 +97,16 @@ export function AppHeader() {
             </motion.button>
           )}
         </AnimatePresence>
+
+        <button
+          type="button"
+          onClick={() => void refreshScreen()}
+          disabled={screenRefreshing}
+          className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
+          title="Refresh this page"
+        >
+          <RefreshCw className={cn('size-4', screenRefreshing && 'animate-spin')} />
+        </button>
 
         {/* Notifications */}
         <div className="relative">

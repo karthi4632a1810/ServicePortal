@@ -6,7 +6,7 @@ const approvalLogSchema = new mongoose.Schema(
     requestNumber: String,
     action: {
       type: String,
-      enum: ['approve', 'reject', 'forward', 'request_info', 'assign', 'start', 'pause', 'complete', 'cancel', 'comment'],
+      enum: ['approve', 'reject', 'forward', 'request_info', 'assign', 'start', 'pause', 'complete', 'cancel', 'comment', 'accept', 'submit_for_review', 'confirm_completion', 'send_back_rework'],
       required: true,
     },
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },

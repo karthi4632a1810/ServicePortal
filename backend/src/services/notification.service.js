@@ -96,6 +96,25 @@ export class NotificationService {
     );
   }
 
+  async notifyCompletionReviewRequired(request, staffUser) {
+    const dept = request.department || request.employee?.department;
+    const hods = await User.find({ role: 'hod', department: dept, active: true });
+    const targets = hods.length
+      ? hods
+      : await User.find({ role: { $in: ['hod', 'admin', 'super_admin'] }, active: true }).limit(5);
+
+    for (const user of targets) {
+      await this.create({
+        userId: user._id,
+        type: 'approval_required',
+        title: 'Confirm Completion',
+        message: `${request.formTitle} (${request.requestNumber}) — ${staffUser.name} finished work and awaits your confirmation`,
+        requestId: request._id,
+        requestNumber: request.requestNumber,
+      });
+    }
+  }
+
   async getForUser(userId, { page = 1, limit = 20 } = {}) {
     const skip = (page - 1) * limit;
     const [items, total] = await Promise.all([

@@ -57,8 +57,8 @@ export const requestController = {
           throw new AppError('You can only view your own requests', 403);
         }
         if (!isEmployee(req.user.role)) {
-          const employee = await hrmsService.getEmployee(targetId);
-          if (!canTrackEmployee(req.user, employee.department)) {
+          const department = await hrmsService.resolveEmployeeDepartment(targetId);
+          if (!canTrackEmployee(req.user, department)) {
             throw new AppError('You can only track staff in your department', 403);
           }
         }
@@ -124,6 +124,66 @@ export const requestController = {
         queueStatus, assignedTo, assignedToUserId, user: req.user,
       });
       return successResponse(res, { message: 'Queue status updated', data: request });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  assign: async (req, res, next) => {
+    try {
+      const { staffId, staffIds } = req.body;
+      const ids = staffIds?.length ? staffIds : staffId;
+      const request = await requestService.assignRequest(req.params.id, ids, req.user);
+      return successResponse(res, { message: 'Work assigned successfully', data: request });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  acceptProcessing: async (req, res, next) => {
+    try {
+      const { remarks } = req.body;
+      const request = await requestService.acceptForProcessing(req.params.id, req.user, remarks);
+      return successResponse(res, { message: 'Request accepted for processing', data: request });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  getAssignedToMe: async (req, res, next) => {
+    try {
+      const requests = await requestService.getAssignedToUser(req.user);
+      return successResponse(res, { message: 'Assigned tasks retrieved', data: requests });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  submitForReview: async (req, res, next) => {
+    try {
+      const { remarks } = req.body;
+      const request = await requestService.submitForReview(req.params.id, remarks, req.user);
+      return successResponse(res, { message: 'Work submitted for HOD review', data: request });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  confirmCompletion: async (req, res, next) => {
+    try {
+      const { remarks } = req.body;
+      const request = await requestService.confirmCompletion(req.params.id, remarks, req.user);
+      return successResponse(res, { message: 'Completion confirmed', data: request });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  sendBackForRework: async (req, res, next) => {
+    try {
+      const { remarks } = req.body;
+      const request = await requestService.sendBackForRework(req.params.id, remarks, req.user);
+      return successResponse(res, { message: 'Sent back for rework', data: request });
     } catch (err) {
       next(err);
     }

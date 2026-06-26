@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import type { AuditLog } from '../types';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const SEVERITY_CONFIG = {
   info: { icon: Info, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950', border: 'border-blue-200 dark:border-blue-800', dot: 'bg-blue-500' },
@@ -79,7 +80,8 @@ function AuditRow({ log }: { log: AuditLog }) {
 }
 
 export function AuditLogPage() {
-  const { auditLogs } = useApp();
+  const { auditLogs, loadAuditLogs } = useApp();
+  useScreenRefresh(loadAuditLogs);
   const [search, setSearch] = useState('');
   const [severityFilter, setSeverityFilter] = useState('');
   const [actionFilter, setActionFilter] = useState('');

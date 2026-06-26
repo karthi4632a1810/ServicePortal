@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../utils/branding';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
-import { api } from '../services/api';
+import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
 import type { Employee } from '../types';
 
 function staffInitials(name: string) {
@@ -53,26 +53,27 @@ export function LoginPage() {
 
     if (id === lastVerifiedId.current && employee?.id === id) return;
 
-    const timer = window.setTimeout(async () => {
+    const timer = window.setTimeout(() => {
       setVerifying(true);
       setProfileError('');
-      setEmployee(null);
-
-      try {
-        const res = await api.getEmployee(id);
-        setEmployee(res.data);
+      void fetchEmployeeTiered(id, undefined, (emp) => {
+        if (identifier.trim() !== id) return;
+        setEmployee(emp);
         lastVerifiedId.current = id;
-      } catch {
-        setEmployee(null);
-        lastVerifiedId.current = '';
-        setProfileError('Staff ID not found');
-      } finally {
+        setProfileError('');
+      }).then((emp) => {
+        if (identifier.trim() !== id) return;
+        if (!emp) {
+          setEmployee(null);
+          lastVerifiedId.current = '';
+          setProfileError('Staff ID not found in HRMS — you can still try signing in');
+        }
         setVerifying(false);
-      }
-    }, 500);
+      });
+    }, 400);
 
     return () => window.clearTimeout(timer);
-  }, [identifier]);
+  }, [identifier, employee?.id]);
 
   const handleIdentifierChange = (value: string) => {
     setIdentifier(value);
@@ -101,7 +102,6 @@ export function LoginPage() {
       setLoading(false);
     }
   };
-
   const showStaffProfile = Boolean(employee);
   const staffMode = isStaffIdInput(identifier);
 
@@ -155,6 +155,20 @@ export function LoginPage() {
                   </p>
                 </div>
               </>
+            ) : staffMode && verifying ? (
+              <>
+                <div className="size-12 rounded-xl bg-muted flex items-center justify-center shrink-0">
+                  <Loader2 className="size-5 text-muted-foreground animate-spin" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h1 className="text-foreground truncate" style={{ fontSize: '18px', fontWeight: 700 }}>
+                    Staff ID {identifier.trim()}
+                  </h1>
+                  <p className="text-muted-foreground truncate" style={{ fontSize: '12px' }}>
+                    Loading profile preview...
+                  </p>
+                </div>
+              </>
             ) : (
               <>
                 <div className="size-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
@@ -189,7 +203,7 @@ export function LoginPage() {
                 )}
               </div>
               {profileError && staffMode && (
-                <p className="text-destructive mt-1.5" style={{ fontSize: '12px' }}>{profileError}</p>
+                <p className="text-amber-600 mt-1.5" style={{ fontSize: '12px' }}>{profileError}</p>
               )}
             </div>
             <div>
@@ -197,8 +211,7 @@ export function LoginPage() {
               <PasswordInput
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder={staffMode && !employee ? 'Enter Staff ID first' : 'Enter your password'}
-                disabled={staffMode && !employee}
+                placeholder="Enter your password"
                 inputClassName="bg-input-background"
                 required
               />
@@ -209,7 +222,7 @@ export function LoginPage() {
             </p>
             <button
               type="submit"
-              disabled={loading || (staffMode && !employee)}
+              disabled={loading}
               className="w-full h-10 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity disabled:opacity-50 flex items-center justify-center gap-2"
               style={{ fontSize: '13px', fontWeight: 600 }}
             >

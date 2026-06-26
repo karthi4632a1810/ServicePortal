@@ -18,8 +18,16 @@ export const hrmsController = {
   getEmployee: async (req, res, next) => {
     try {
       const phone = req.query.phone ? String(req.query.phone) : undefined;
-      const employee = await hrmsService.getEmployee(req.params.employeeId, phone);
-      return successResponse(res, { message: 'Employee verified from HRMS', data: employee });
+      const fast = req.query.fast === '1' || req.query.fast === 'true';
+      const live = req.query.live === '1' || req.query.live === 'true';
+      const mode = fast ? 'cache' : live || phone ? 'live' : 'auto';
+      const employee = await hrmsService.getEmployee(req.params.employeeId, phone, { mode });
+      const source = employee.hrmsSource || (fast ? 'portal_cache' : 'hrms');
+      return successResponse(res, {
+        message: source.startsWith('portal') ? 'Employee loaded from portal cache' : 'Employee verified from HRMS',
+        data: employee,
+        meta: { source },
+      });
     } catch (err) {
       err.statusCode = err.statusCode || 404;
       next(err);

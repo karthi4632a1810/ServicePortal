@@ -1,6 +1,7 @@
 const DB_NAME = 'PaperZero';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'employeeProfiles';
+const DETAIL_STORE = 'employeeDetails';
 
 export interface EmployeeProfile {
   employeeId: string;
@@ -20,6 +21,9 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(STORE_NAME)) {
         const store = db.createObjectStore(STORE_NAME, { keyPath: 'employeeId' });
         store.createIndex('lastUsed', 'lastUsed', { unique: false });
+      }
+      if (!db.objectStoreNames.contains(DETAIL_STORE)) {
+        db.createObjectStore(DETAIL_STORE, { keyPath: 'employeeId' });
       }
     };
   });

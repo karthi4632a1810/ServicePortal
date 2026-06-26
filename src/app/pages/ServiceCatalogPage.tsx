@@ -12,6 +12,7 @@ import { useApp } from '../context/AppContext';
 import { hasAdminAccess } from '../utils/roleAccess';
 import { StaffLoginModal } from '../components/auth/StaffLoginModal';
 import type { FormSchema } from '../types';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const ICON_MAP: Record<string, React.ElementType> = {
   Wifi, Mail, Clock, CalendarOff, IndianRupee, Monitor,
@@ -91,6 +92,8 @@ export function ServiceCatalogPage() {
       refreshForms().finally(() => setRefreshing(false));
     }
   }, [forms.length, loading, refreshForms]);
+
+  useScreenRefresh(refreshForms);
 
   useEffect(() => {
     if (!isAuthenticated || !currentUser) return;

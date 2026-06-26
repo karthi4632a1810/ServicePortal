@@ -69,9 +69,11 @@ export const approvalController = {
 
   forward: async (req, res, next) => {
     try {
+      const { remarks, staffId } = req.body;
       const request = await approvalService.processAction(req.params.requestId, 'forward', {
         user: req.user,
-        remarks: req.body.remarks,
+        remarks,
+        forwardToStaffId: staffId,
       });
       return successResponse(res, { message: 'Request forwarded', data: request });
     } catch (err) {

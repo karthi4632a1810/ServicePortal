@@ -1,5 +1,5 @@
 import type { Request } from '../types';
-import type { WFRequest, WFStep, WFComment, WFPriority, WFStatus } from '../data/workflowData';
+import type { WFRequest, WFStep, WFComment, WFPriority, WFPipelineStatus } from '../data/workflowData';
 
 const FORM_ICONS: Record<string, string> = {
   'WiFi / Network Access Request': 'Wifi',
@@ -19,9 +19,41 @@ function mapStepStatus(status: string, index: number, currentStep: number): WFSt
   return 'pending';
 }
 
-function mapRequestStatus(status: Request['status']): WFStatus {
-  if (status === 'sent_back' || status === 'cancelled') return 'submitted';
-  return status as WFStatus;
+function hasAssignee(req: Request): boolean {
+  return Boolean(
+    req.assignedTo
+    || req.assignedToEmployeeId
+    || req.assignees?.some((a) => a.status !== 'cancelled'),
+  );
+}
+
+function resolvePipelineStatus(req: Request): WFPipelineStatus {
+  if (req.status === 'rejected' || req.status === 'cancelled') return 'rejected';
+  if (req.status === 'completed') return 'completed';
+
+  const receiverAccepted = Boolean(req.receiverAcceptedBy || req.receiverApprovedBy);
+  if (receiverAccepted) {
+    const queueStatus = req.queueStatus || 'pending';
+    if (queueStatus === 'in_progress' || queueStatus === 'pending_hod_review') {
+      return 'processing';
+    }
+    return hasAssignee(req) ? 'assigned' : 'accepted';
+  }
+
+  if (req.status === 'approved') return hasAssignee(req) ? 'assigned' : 'accepted';
+  return 'accepted';
+}
+
+export function isPipelineRequest(req: Request): boolean {
+  if (['submitted', 'sent_back'].includes(req.status)) return false;
+
+  const receiverAccepted = Boolean(req.receiverAcceptedBy || req.receiverApprovedBy);
+  if (receiverAccepted) return true;
+
+  if (['completed', 'rejected', 'cancelled', 'approved'].includes(req.status)) return true;
+  if (req.status === 'processing') return false;
+
+  return false;
 }
 
 export function mapRequestToWorkflow(req: Request, index = 0): WFRequest {
@@ -33,16 +65,19 @@ export function mapRequestToWorkflow(req: Request, index = 0): WFRequest {
   return {
     id: req.id,
     requestNumber: req.requestNumber,
+    formId: req.formId,
     formTitle: req.formTitle,
     category: req.category,
     categoryIcon: FORM_ICONS[req.formTitle] || 'FileText',
     employeeName: req.employee.name,
     employeeId: req.employee.id,
     employeeDept: req.employee.department,
+    department: req.department,
     employeeDesignation: req.employee.designation,
     employeeInitials: initials,
     employeeColor: COLORS[index % COLORS.length],
-    status: mapRequestStatus(req.status),
+    status: req.status,
+    pipelineStatus: resolvePipelineStatus(req),
     priority: req.priority as WFPriority,
     submittedAt: req.submittedAt,
     dueAt,
@@ -52,15 +87,23 @@ export function mapRequestToWorkflow(req: Request, index = 0): WFRequest {
     attachmentsCount: req.attachments?.length ?? 0,
     assignedTo: req.assignedTo,
     assignedInitials: req.assignedTo?.split(' ').map((p) => p[0]).join(''),
+    assignedToEmployeeId: req.assignedToEmployeeId,
+    receiverApprovedBy: req.receiverApprovedBy || req.receiverAcceptedBy,
+    receiverAcceptedBy: req.receiverAcceptedBy || req.receiverApprovedBy,
+    staffFinishRemarks: req.staffFinishRemarks,
+    staffFinishedBy: req.staffFinishedBy,
+    assignees: req.assignees,
+    queueStatus: req.queueStatus,
     watchers: [req.employee.hod].filter(Boolean),
     tags: [req.category.split(' ')[0]?.toLowerCase() ?? 'request'],
     branch: req.employee.branch,
     isNew: Date.now() - new Date(req.submittedAt).getTime() < 86400000,
     isOverdue,
-    answers: Object.fromEntries(Object.entries(req.answers).map(([k, v]) => [k, String(v ?? '')])),
+    answers: Object.fromEntries(Object.entries(req.answers ?? {}).map(([k, v]) => [k, String(v ?? '')])),
     steps: req.workflow.map((step, i) => ({
       id: step.id,
       label: step.name,
+      type: step.type,
       status: mapStepStatus(step.status, i, req.currentStep),
       actor: step.completedBy || step.assignee,
       role: step.role,
@@ -81,5 +124,5 @@ export function mapRequestToWorkflow(req: Request, index = 0): WFRequest {
 }
 
 export function requestsToWorkflow(requests: Request[]): WFRequest[] {
-  return requests.map((r, i) => mapRequestToWorkflow(r, i));
+  return requests.filter(isPipelineRequest).map((r, i) => mapRequestToWorkflow(r, i));
 }

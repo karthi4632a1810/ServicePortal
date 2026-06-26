@@ -20,6 +20,7 @@ export function getHrmsPool() {
       connectionLimit: 10,
       queueLimit: 0,
       enableKeepAlive: true,
+      connectTimeout: 8000,
     });
   }
   return pool;

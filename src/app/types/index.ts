@@ -12,8 +12,10 @@ export type Page =
   | 'service-catalog'
   | 'dynamic-form'
   | 'my-requests'
+  | 'my-tasks'
   | 'request-detail'
   | 'approvals'
+  | 'accept'
   | 'workflow-pipeline'
   | 'work-queue'
   | 'form-builder'
@@ -56,6 +58,7 @@ export interface Employee {
   experience?: string;
   panNo?: string;
   mobile2?: string;
+  hrmsSource?: 'portal_user' | 'request_snapshot' | 'portal_cache_fallback' | 'hrms' | 'hrms_api';
   details?: Record<string, unknown>;
 }
 
@@ -98,6 +101,7 @@ export interface WorkflowStep {
   name: string;
   type: 'hod' | 'reporting_manager' | 'specific_user' | 'specific_role' | 'department_processor' | 'parallel';
   assignee?: string;
+  assigneeEmployeeId?: string;
   role?: string;
   status: 'pending' | 'approved' | 'rejected' | 'skipped';
   completedAt?: string;
@@ -123,7 +127,24 @@ export interface Request {
   attachments: Attachment[];
   priority: 'low' | 'medium' | 'high';
   assignedTo?: string;
+  assignedToEmployeeId?: string;
+  assignedToUserId?: string;
+  receiverApprovedBy?: string;
+  receiverApprovedAt?: string;
+  receiverAcceptedBy?: string;
+  receiverAcceptedAt?: string;
+  staffFinishRemarks?: string;
+  staffFinishedBy?: string;
+  staffFinishedAt?: string;
+  assignees?: Array<{ employeeId: string; name: string; userId?: string; status: string }>;
+  queueStatus?: 'pending' | 'in_progress' | 'pending_hod_review' | 'paused' | 'completed' | 'cancelled';
   dueDate?: string;
+}
+
+export type MyTaskType = 'work' | 'confirm_completion';
+
+export interface MyTask extends Request {
+  taskType?: MyTaskType;
 }
 
 export interface Comment {

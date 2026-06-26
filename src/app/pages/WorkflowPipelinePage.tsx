@@ -6,7 +6,7 @@ import {
   AlertTriangle, TrendingUp, Users, Zap, SlidersHorizontal,
   RefreshCw, Download, ArrowUpRight, Paperclip, MessageSquare,
   User, Building2, Calendar, ChevronRight, Wifi, Mail,
-  CalendarOff, IndianRupee, Monitor, Plus,
+  CalendarOff, IndianRupee, Monitor, Plus, ClipboardCheck,
 } from 'lucide-react';
 import { cn } from '../components/ui/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
@@ -25,15 +25,17 @@ import { stagger, fadeUp, scaleIn } from '../lib/animations';
 
 import {
   COLUMNS, PRIORITY_CONFIG,
-  type WFRequest, type WFStatus, type ColumnConfig,
+  type WFRequest, type WFPipelineStatus, type ColumnConfig,
 } from '../data/workflowData';
 import { useApp } from '../context/AppContext';
-import { requestsToWorkflow } from '../utils/mapRequestToWorkflow';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { requestsToWorkflow, mapRequestToWorkflow } from '../utils/mapRequestToWorkflow';
+import { api } from '../services/api';
 
 /* ── Icon map ────────────────────────────────────────────────── */
 const ICON_MAP: Record<string, React.ElementType> = {
   Send, CheckCircle, XCircle, Loader2, CheckSquare, Clock,
-  Wifi, Mail, CalendarOff, IndianRupee, Monitor,
+  Wifi, Mail, CalendarOff, IndianRupee, Monitor, User, ClipboardCheck,
 };
 
 /* ── Helpers ─────────────────────────────────────────────────── */
@@ -70,27 +72,36 @@ function SLAChip({ req }: { req: WFRequest }) {
   );
 }
 
-/* ── Step dots ───────────────────────────────────────────────── */
-function StepDots({ steps, current }: { steps: WFRequest['steps']; current: number }) {
-  return (
-    <div className="flex items-center gap-1">
-      {steps.map((s, i) => (
-        <div key={s.id}
-          className={cn(
-            'rounded-full transition-all',
-            s.status === 'done' ? 'bg-emerald-500' :
-            s.status === 'active' ? 'bg-primary' :
-            s.status === 'rejected' ? 'bg-red-500' :
-            'bg-muted-foreground/20'
-          )}
-          style={{ width: s.status === 'active' ? 14 : 6, height: 6 }}
-        />
-      ))}
-      <span className="text-muted-foreground ml-1" style={{ fontSize: '9px' }}>
-        {current}/{steps.length}
-      </span>
-    </div>
-  );
+function isAwaitingHodConfirm(req: WFRequest) {
+  return req.queueStatus === 'pending_hod_review';
+}
+
+function sortColumnRequests(requests: WFRequest[], columnStatus: WFPipelineStatus): WFRequest[] {
+  const sorted = [...requests];
+  if (columnStatus === 'processing') {
+    return sorted.sort((a, b) => {
+      const rank = (r: WFRequest) => {
+        if (r.queueStatus === 'pending_hod_review') return 0;
+        if (r.queueStatus === 'in_progress') return 1;
+        return 2;
+      };
+      const diff = rank(a) - rank(b);
+      if (diff !== 0) return diff;
+      return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+    });
+  }
+  return sorted.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+}
+
+function staffInitials(name?: string) {
+  if (!name) return '??';
+  return name
+    .replace(/^(Mr|Mrs|Ms|Dr)\.?\s+/i, '')
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((p) => p[0]?.toUpperCase() || '')
+    .join('') || '??';
 }
 
 /* ── Pipeline Card ───────────────────────────────────────────── */
@@ -98,123 +109,137 @@ function PipelineCard({
   req,
   accent,
   onClick,
-  index,
 }: {
   req: WFRequest;
   accent: string;
   onClick: () => void;
-  index: number;
 }) {
   const priorityCfg = PRIORITY_CONFIG[req.priority];
   const CatIcon = ICON_MAP[req.categoryIcon] ?? Send;
+  const awaitingConfirm = isAwaitingHodConfirm(req);
+  const inProgress = req.queueStatus === 'in_progress';
 
   return (
     <motion.div
       variants={fadeUp}
       layout
       layoutId={req.id}
-      whileHover={{ y: -3, boxShadow: `0 12px 32px -8px rgba(0,0,0,0.12), 0 0 0 1px ${accent}22` }}
+      whileHover={{ y: -2 }}
       onClick={onClick}
       className={cn(
-        'group relative bg-card rounded-xl border border-border/70 cursor-pointer overflow-hidden',
-        'border-l-[3px] transition-shadow',
-        priorityCfg.border
+        'group relative rounded-xl border cursor-pointer overflow-hidden transition-all',
+        'shadow-sm hover:shadow-md',
+        awaitingConfirm
+          ? 'bg-amber-50/90 dark:bg-amber-950/35 border-amber-300/80 dark:border-amber-700/60 ring-1 ring-amber-200/80 dark:ring-amber-800/50'
+          : inProgress
+            ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40'
+            : 'bg-card border-border/70 hover:border-primary/25',
       )}
+      style={{ borderLeftWidth: 3, borderLeftColor: awaitingConfirm ? '#D97706' : inProgress ? '#7C3AED' : accent }}
     >
-      {/* NEW badge */}
-      {req.isNew && (
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className="absolute top-2 right-2 z-10"
-        >
+      {awaitingConfirm && (
+        <div className="px-3 py-1.5 bg-amber-100/90 dark:bg-amber-900/50 border-b border-amber-200/80 dark:border-amber-800/50 flex items-center gap-1.5">
           <motion.span
-            animate={{ scale: [1, 1.1, 1] }}
+            animate={{ opacity: [1, 0.55, 1] }}
             transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-            className="px-1.5 py-0.5 rounded-full bg-primary text-primary-foreground"
-            style={{ fontSize: '8px', fontWeight: 800 }}
-          >
-            NEW
-          </motion.span>
-        </motion.div>
-      )}
-
-      {/* Hover glow accent line */}
-      <motion.div
-        className="absolute top-0 left-0 right-0 h-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
-        style={{ background: `linear-gradient(90deg, ${accent}00, ${accent}, ${accent}00)` }}
-      />
-
-      <div className="p-3.5">
-        {/* Top row */}
-        <div className="flex items-start justify-between gap-2 mb-2.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="size-7 rounded-lg flex items-center justify-center shrink-0"
-              style={{ background: accent + '18' }}>
-              <CatIcon className="size-3.5" style={{ color: accent }} />
-            </div>
-            <div className="min-w-0">
-              <p className="text-foreground leading-tight" style={{ fontSize: '12px', fontWeight: 600, lineHeight: 1.25 }}>
-                {req.formTitle}
-              </p>
-              <p className="text-muted-foreground" style={{ fontSize: '10px', fontFamily: 'monospace' }}>
-                {req.requestNumber}
-              </p>
-            </div>
-          </div>
-
-          <span className={cn('px-1.5 py-0.5 rounded shrink-0', priorityCfg.bg, priorityCfg.text)}
-            style={{ fontSize: '8px', fontWeight: 800 }}>
-            {req.priority.toUpperCase()}
+            className="size-1.5 rounded-full bg-amber-500 shrink-0"
+          />
+          <span className="text-amber-800 dark:text-amber-200 truncate" style={{ fontSize: '10px', fontWeight: 700 }}>
+            Staff finished — confirm completion
           </span>
         </div>
+      )}
 
-        {/* Employee */}
-        <div className="flex items-center gap-2 mb-2.5">
-          <div className="size-6 rounded-full flex items-center justify-center shrink-0"
-            style={{ background: req.employeeColor + '22', border: `1px solid ${req.employeeColor}44` }}>
-            <span style={{ fontSize: '8px', fontWeight: 700, color: req.employeeColor }}>{req.employeeInitials}</span>
+      <div className="p-3 space-y-3">
+        {/* Header */}
+        <div className="flex items-start gap-2.5">
+          <div
+            className="size-9 rounded-lg flex items-center justify-center shrink-0"
+            style={{ background: accent + '18' }}
+          >
+            <CatIcon className="size-4" style={{ color: accent }} />
           </div>
-          <div className="min-w-0">
+          <div className="flex-1 min-w-0">
+            <p className="text-foreground leading-snug line-clamp-2" style={{ fontSize: '12px', fontWeight: 600 }}>
+              {req.formTitle}
+            </p>
+            <p className="text-muted-foreground mt-0.5 truncate" style={{ fontSize: '10px', fontFamily: 'monospace' }}>
+              {req.requestNumber}
+            </p>
+          </div>
+        </div>
+
+        {/* Badges row */}
+        <div className="flex flex-wrap items-center gap-1.5">
+          <span className={cn('px-1.5 py-0.5 rounded-md', priorityCfg.bg, priorityCfg.text)}
+            style={{ fontSize: '9px', fontWeight: 700 }}>
+            {req.priority.toUpperCase()}
+          </span>
+          {req.isNew && !awaitingConfirm && (
+            <span className="px-1.5 py-0.5 rounded-md bg-primary text-primary-foreground"
+              style={{ fontSize: '9px', fontWeight: 700 }}>
+              NEW
+            </span>
+          )}
+          {inProgress && !awaitingConfirm && (
+            <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
+              style={{ fontSize: '9px', fontWeight: 700 }}>
+              IN PROGRESS
+            </span>
+          )}
+        </div>
+
+        {/* Requester */}
+        <div className="flex items-center gap-2.5 p-2 rounded-lg bg-muted/30 border border-border/40">
+          <div
+            className="size-7 rounded-full flex items-center justify-center shrink-0"
+            style={{ background: req.employeeColor + '22', border: `1px solid ${req.employeeColor}44` }}
+          >
+            <span style={{ fontSize: '9px', fontWeight: 700, color: req.employeeColor }}>{req.employeeInitials}</span>
+          </div>
+          <div className="flex-1 min-w-0">
             <p className="text-foreground truncate" style={{ fontSize: '11px', fontWeight: 500 }}>{req.employeeName}</p>
             <p className="text-muted-foreground truncate" style={{ fontSize: '10px' }}>{req.employeeDept}</p>
           </div>
-          {req.assignedTo && (
-            <div className="ml-auto size-5 rounded-full bg-muted flex items-center justify-center shrink-0"
-              title={`Assigned to ${req.assignedTo}`}>
-              <span className="text-muted-foreground" style={{ fontSize: '7px', fontWeight: 700 }}>{req.assignedInitials}</span>
+          {(req.assignedTo || req.assignees?.length) && (
+            <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-border/50">
+              <User className="size-3 text-muted-foreground" />
+              <div
+                className="size-6 rounded-full bg-background border border-border flex items-center justify-center"
+                title={req.assignedTo || req.assignees?.[0]?.name}
+              >
+                <span className="text-muted-foreground" style={{ fontSize: '8px', fontWeight: 700 }}>
+                  {req.assignedInitials || staffInitials(req.assignees?.[0]?.name)}
+                </span>
+              </div>
             </div>
           )}
         </div>
 
-        {/* Step dots */}
-        <StepDots steps={req.steps} current={req.currentStep} />
+        {/* Staff finish preview */}
+        {awaitingConfirm && req.staffFinishRemarks && (
+          <p className="text-amber-900/80 dark:text-amber-100/80 line-clamp-2 px-2 py-1.5 rounded-md bg-amber-100/50 dark:bg-amber-900/30"
+            style={{ fontSize: '10px', lineHeight: 1.45 }}>
+            <span style={{ fontWeight: 600 }}>{req.staffFinishedBy}:</span> {req.staffFinishRemarks}
+          </p>
+        )}
 
-        {/* Footer */}
-        <div className="flex items-center justify-between mt-2.5 pt-2.5 border-t border-border/50">
+        {/* Footer meta */}
+        <div className="flex items-center justify-between gap-2 pt-2 border-t border-border/50">
           <SLAChip req={req} />
-          <div className="flex items-center gap-2 text-muted-foreground">
+          <div className="flex items-center gap-2 text-muted-foreground shrink-0">
             {req.commentsCount > 0 && (
-              <span className="flex items-center gap-0.5" style={{ fontSize: '10px' }}>
-                <MessageSquare className="size-2.5" />{req.commentsCount}
+              <span className="inline-flex items-center gap-0.5" style={{ fontSize: '10px' }}>
+                <MessageSquare className="size-3" />{req.commentsCount}
               </span>
             )}
             {req.attachmentsCount > 0 && (
-              <span className="flex items-center gap-0.5" style={{ fontSize: '10px' }}>
-                <Paperclip className="size-2.5" />{req.attachmentsCount}
+              <span className="inline-flex items-center gap-0.5" style={{ fontSize: '10px' }}>
+                <Paperclip className="size-3" />{req.attachmentsCount}
               </span>
             )}
           </div>
         </div>
-
-        {/* Tags */}
-        {req.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1 mt-2">
-            {req.tags.slice(0, 2).map(t => (
-              <span key={t} className="px-1.5 py-0.5 rounded bg-muted text-muted-foreground" style={{ fontSize: '9px' }}>{t}</span>
-            ))}
-          </div>
-        )}
       </div>
     </motion.div>
   );
@@ -236,6 +261,8 @@ function PipelineColumn({
 }) {
   const ColIcon = ICON_MAP[col.iconName] ?? Send;
   const overdueCount = requests.filter(r => r.isOverdue).length;
+  const sortedRequests = sortColumnRequests(requests, col.status);
+  const confirmCount = col.status === 'processing' ? requests.filter(isAwaitingHodConfirm).length : 0;
 
   return (
     <motion.div
@@ -281,6 +308,12 @@ function PipelineColumn({
                       <AlertTriangle className="size-2.5" />{overdueCount}
                     </motion.span>
                   )}
+                  {confirmCount > 0 && (
+                    <span className="flex items-center gap-0.5 text-amber-700 dark:text-amber-300"
+                      style={{ fontSize: '9px', fontWeight: 700 }}>
+                      <CheckCircle className="size-2.5" />{confirmCount}
+                    </span>
+                  )}
                 </div>
               </motion.div>
             )}
@@ -319,8 +352,8 @@ function PipelineColumn({
               </motion.div>
             ) : (
               <motion.div variants={stagger(0.05)} initial="hidden" animate="show" className="space-y-3">
-                {requests.map((req, i) => (
-                  <PipelineCard key={req.id} req={req} accent={col.accent} onClick={() => onCardClick(req)} index={i} />
+                {sortedRequests.map((req) => (
+                  <PipelineCard key={req.id} req={req} accent={col.accent} onClick={() => onCardClick(req)} />
                 ))}
               </motion.div>
             )}
@@ -335,7 +368,7 @@ function PipelineColumn({
 function StatStrip({ requests }: { requests: WFRequest[] }) {
   const total = requests.length;
   const overdue = requests.filter(r => r.isOverdue).length;
-  const pending = requests.filter(r => r.status === 'pending_approval').length;
+  const accepted = requests.filter(r => r.pipelineStatus === 'accepted').length;
   const completed = requests.filter(r => r.status === 'completed').length;
   const completionRate = total > 0 ? Math.round((completed / total) * 100) : 0;
 
@@ -348,7 +381,7 @@ function StatStrip({ requests }: { requests: WFRequest[] }) {
     >
       {[
         { label: 'Total Requests', value: total, icon: LayoutGrid, color: 'text-primary', iconBg: 'bg-primary/10', change: '+4 today' },
-        { label: 'Pending Approval', value: pending, icon: Clock, color: 'text-amber-600', iconBg: 'bg-amber-50 dark:bg-amber-950', change: 'Needs action' },
+        { label: 'Accepted', value: accepted, icon: CheckCircle, color: 'text-emerald-600', iconBg: 'bg-emerald-50 dark:bg-emerald-950', change: 'Ready to assign' },
         { label: 'SLA Breached', value: overdue, icon: AlertTriangle, color: 'text-red-600', iconBg: 'bg-red-50 dark:bg-red-950', change: 'Critical' },
         { label: 'Completion Rate', value: completionRate, icon: TrendingUp, color: 'text-emerald-600', iconBg: 'bg-emerald-50 dark:bg-emerald-950', change: '+8% this week', suffix: '%' },
       ].map(({ label, value, icon: Icon, color, iconBg, change, suffix }, i) => (
@@ -404,7 +437,7 @@ function TimelineView({ requests, onSelect }: { requests: WFRequest[]; onSelect:
           </div>
           <div className="space-y-2">
             {reqs.map((req) => {
-              const col = COLUMNS.find(c => c.status === req.status)!;
+              const col = COLUMNS.find(c => c.status === req.pipelineStatus)!;
               const CatIcon = ICON_MAP[req.categoryIcon] ?? Send;
               const ColIcon = ICON_MAP[col.iconName] ?? Send;
               const pcfg = PRIORITY_CONFIG[req.priority];
@@ -559,7 +592,7 @@ type FilterKey = 'all' | 'my_queue' | 'overdue' | 'high_priority' | 'pending';
 
 const FILTERS: { id: FilterKey; label: string; dot?: string }[] = [
   { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending', dot: '#D97706' },
+  { id: 'pending', label: 'Accepted', dot: '#059669' },
   { id: 'my_queue', label: 'My Queue', dot: '#2563EB' },
   { id: 'overdue', label: 'Overdue', dot: '#DC2626' },
   { id: 'high_priority', label: 'High Priority', dot: '#7C3AED' },
@@ -567,14 +600,16 @@ const FILTERS: { id: FilterKey; label: string; dot?: string }[] = [
 
 /* ── Main page ───────────────────────────────────────────────── */
 export function WorkflowPipelinePage() {
-  const { requests, loading: appLoading, currentUser, chartData } = useApp();
+  const { requests, loading: appLoading, currentUser, chartData, performApprovalAction, refreshRequests, updateRequest } = useApp();
   const workflowRequests = useMemo(() => requestsToWorkflow(requests), [requests]);
   const [view, setView] = useState<'pipeline' | 'timeline' | 'analytics'>('pipeline');
   const [filter, setFilter] = useState<FilterKey>('all');
   const [search, setSearch] = useState('');
   const [selectedReq, setSelectedReq] = useState<WFRequest | null>(null);
-  const [collapsed, setCollapsed] = useState<Set<WFStatus>>(new Set(['rejected']));
+  const [collapsed, setCollapsed] = useState<Set<WFPipelineStatus>>(new Set(['rejected']));
   const [showSearch, setShowSearch] = useState(false);
+
+  useScreenRefresh(refreshRequests);
 
   const isLoading = appLoading;
 
@@ -583,9 +618,13 @@ export function WorkflowPipelinePage() {
     let reqs = workflowRequests;
     if (filter === 'overdue') reqs = reqs.filter(r => r.isOverdue);
     if (filter === 'high_priority') reqs = reqs.filter(r => r.priority === 'high' || r.priority === 'critical');
-    if (filter === 'pending') reqs = reqs.filter(r => r.status === 'pending_approval');
+    if (filter === 'pending') reqs = reqs.filter(r => r.pipelineStatus === 'accepted');
     if (filter === 'my_queue') reqs = reqs.filter(r =>
-      currentUser && (r.assignedTo === currentUser.name || r.assignedInitials === currentUser.initials)
+      currentUser && (
+        r.assignedToEmployeeId === currentUser.employeeId
+        || r.assignedTo === currentUser.name
+        || r.assignedInitials === currentUser.initials
+      )
     );
     if (search) {
       const q = search.toLowerCase();
@@ -599,8 +638,8 @@ export function WorkflowPipelinePage() {
     return reqs;
   }, [filter, search, workflowRequests, currentUser]);
 
-  const reqsByStatus = (status: WFStatus) => filtered.filter(r => r.status === status);
-  const toggleCollapse = (status: WFStatus) => {
+  const reqsByStatus = (status: WFPipelineStatus) => filtered.filter(r => r.pipelineStatus === status);
+  const toggleCollapse = (status: WFPipelineStatus) => {
     setCollapsed(prev => {
       const next = new Set(prev);
       next.has(status) ? next.delete(status) : next.add(status);
@@ -783,7 +822,53 @@ export function WorkflowPipelinePage() {
       </div>
 
       {/* ── Detail Panel ───────────────────────────────────────── */}
-      <DetailPanel request={selectedReq} onClose={() => setSelectedReq(null)} />
+      <DetailPanel
+        request={selectedReq}
+        onClose={() => setSelectedReq(null)}
+        currentUser={currentUser}
+        onApprove={async (id, action, remarks) => {
+          const updated = await performApprovalAction(id, action, remarks);
+          updateRequest(updated);
+          setSelectedReq(mapRequestToWorkflow(updated, 0));
+          await refreshRequests();
+        }}
+        onAcceptProcessing={async (id, remarks) => {
+          const res = await api.acceptProcessing(id, remarks);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+        onAssign={async (id, staffIds) => {
+          const res = await api.assignRequest(id, staffIds);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+        onQueueUpdate={async (id, queueStatus) => {
+          const res = await api.updateQueueStatus(id, { queueStatus });
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+        onSubmitForReview={async (id, remarks) => {
+          const res = await api.submitForReview(id, remarks);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+        onConfirmCompletion={async (id, remarks) => {
+          const res = await api.confirmCompletion(id, remarks);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+        onSendBackForRework={async (id, remarks) => {
+          const res = await api.sendBackForRework(id, remarks);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+          await refreshRequests();
+        }}
+      />
     </motion.div>
   );
 }

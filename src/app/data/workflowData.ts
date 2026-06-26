@@ -1,16 +1,21 @@
-export type WFStatus =
-  | 'submitted'
-  | 'pending_approval'
-  | 'approved'
+import type { RequestStatus } from '../types';
+
+export type WFPipelineStatus =
+  | 'accepted'
+  | 'assigned'
   | 'processing'
   | 'completed'
   | 'rejected';
+
+/** @deprecated Use WFPipelineStatus — kept as alias for pipeline column keys */
+export type WFStatus = WFPipelineStatus;
 
 export type WFPriority = 'critical' | 'high' | 'medium' | 'low';
 
 export interface WFStep {
   id: string;
   label: string;
+  type?: string;
   status: 'done' | 'active' | 'pending' | 'rejected';
   actor?: string;
   role?: string;
@@ -32,16 +37,19 @@ export interface WFComment {
 export interface WFRequest {
   id: string;
   requestNumber: string;
+  formId: string;
   formTitle: string;
   category: string;
   categoryIcon: string;
   employeeName: string;
   employeeId: string;
   employeeDept: string;
+  department: string;
   employeeDesignation: string;
   employeeInitials: string;
   employeeColor: string;
-  status: WFStatus;
+  status: RequestStatus;
+  pipelineStatus: WFPipelineStatus;
   priority: WFPriority;
   submittedAt: string;
   dueAt: string;
@@ -52,6 +60,13 @@ export interface WFRequest {
   attachmentsCount: number;
   assignedTo?: string;
   assignedInitials?: string;
+  assignedToEmployeeId?: string;
+  receiverApprovedBy?: string;
+  receiverAcceptedBy?: string;
+  staffFinishRemarks?: string;
+  staffFinishedBy?: string;
+  assignees?: Array<{ employeeId: string; name: string; status: string }>;
+  queueStatus?: 'pending' | 'in_progress' | 'pending_hod_review' | 'paused' | 'completed' | 'cancelled';
   watchers: string[];
   tags: string[];
   branch: string;
@@ -62,7 +77,7 @@ export interface WFRequest {
 }
 
 export interface ColumnConfig {
-  status: WFStatus;
+  status: WFPipelineStatus;
   label: string;
   accent: string;
   trackBg: string;
@@ -74,34 +89,24 @@ export interface ColumnConfig {
 
 export const COLUMNS: ColumnConfig[] = [
   {
-    status: 'submitted',
-    label: 'Submitted',
-    accent: '#2563EB',
-    trackBg: 'bg-blue-50/80 dark:bg-blue-950/30',
-    headerBg: 'bg-blue-50 dark:bg-blue-950/40',
-    badgeBg: 'bg-blue-100 dark:bg-blue-900',
-    badgeText: 'text-blue-700 dark:text-blue-300',
-    iconName: 'Send',
-  },
-  {
-    status: 'pending_approval',
-    label: 'Pending Approval',
-    accent: '#D97706',
-    trackBg: 'bg-amber-50/80 dark:bg-amber-950/30',
-    headerBg: 'bg-amber-50 dark:bg-amber-950/40',
-    badgeBg: 'bg-amber-100 dark:bg-amber-900',
-    badgeText: 'text-amber-700 dark:text-amber-300',
-    iconName: 'Clock',
-  },
-  {
-    status: 'approved',
-    label: 'Approved',
+    status: 'accepted',
+    label: 'Accepted',
     accent: '#059669',
     trackBg: 'bg-emerald-50/80 dark:bg-emerald-950/30',
     headerBg: 'bg-emerald-50 dark:bg-emerald-950/40',
     badgeBg: 'bg-emerald-100 dark:bg-emerald-900',
     badgeText: 'text-emerald-700 dark:text-emerald-300',
     iconName: 'CheckCircle',
+  },
+  {
+    status: 'assigned',
+    label: 'Assigned to',
+    accent: '#2563EB',
+    trackBg: 'bg-blue-50/80 dark:bg-blue-950/30',
+    headerBg: 'bg-blue-50 dark:bg-blue-950/40',
+    badgeBg: 'bg-blue-100 dark:bg-blue-900',
+    badgeText: 'text-blue-700 dark:text-blue-300',
+    iconName: 'User',
   },
   {
     status: 'processing',

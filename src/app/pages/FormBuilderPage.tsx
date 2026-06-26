@@ -22,6 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '../components/ui/select';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 type FieldType = 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'date' | 'time' | 'dropdown' | 'multiselect' | 'radio' | 'checkbox' | 'file' | 'section_title' | 'divider';
 
@@ -316,6 +317,7 @@ export function FormBuilderPage() {
   }, []);
 
   useEffect(() => { loadFormList(); }, [loadFormList]);
+  useScreenRefresh(loadFormList);
 
   useEffect(() => {
     api.getDepartments()

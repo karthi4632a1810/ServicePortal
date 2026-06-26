@@ -5,7 +5,10 @@ export function escapeRegex(value) {
 }
 
 export function departmentsMatch(a, b) {
-  return String(a || '').trim().toLowerCase() === String(b || '').trim().toLowerCase();
+  const na = String(a || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  const nb = String(b || '').trim().toLowerCase().replace(/\s+/g, ' ');
+  if (!na || !nb) return false;
+  return na === nb || na.includes(nb) || nb.includes(na);
 }
 
 /** MongoDB filter: super admin sees all; HOD sees own department only. */
@@ -36,7 +39,14 @@ export function canAccessRequest(user, request) {
   }
   if (isEmployee(user.role)) {
     const empId = String(request?.employee?.id || '').trim();
-    return empId && empId === String(user.employeeId || '').trim();
+    if (empId && empId === String(user.employeeId || '').trim()) return true;
+    const userEmpId = String(user.employeeId || '').trim();
+    const assignees = request?.assignees || [];
+    if (assignees.some((a) => userEmpId && String(a.employeeId) === userEmpId)) return true;
+    if (request?.assignedToEmployeeId && userEmpId && String(request.assignedToEmployeeId) === userEmpId) {
+      return true;
+    }
+    return false;
   }
   return true;
 }

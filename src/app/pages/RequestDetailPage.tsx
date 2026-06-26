@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   ChevronLeft, CheckCircle, XCircle, Clock, FileText, User,
@@ -8,7 +8,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
+import { api } from '../services/api';
 import type { RequestStatus } from '../types';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950', border: 'border-blue-200 dark:border-blue-800' },
@@ -47,11 +49,19 @@ function TimelineEvent({ by, role, text, timestamp, type, isLast }: {
 }
 
 export function RequestDetailPage() {
-  const { selectedRequest, navigate, performApprovalAction, currentUser } = useApp();
+  const { selectedRequest, navigate, performApprovalAction, currentUser, updateRequest } = useApp();
   const [comment, setComment] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
+
+  const reloadRequest = useCallback(async () => {
+    if (!selectedRequest?.id) return;
+    const res = await api.getRequest(selectedRequest.id);
+    updateRequest(res.data);
+  }, [selectedRequest?.id, updateRequest]);
+
+  useScreenRefresh(reloadRequest);
 
   const req = selectedRequest;
   if (!req) {
@@ -68,7 +78,10 @@ export function RequestDetailPage() {
       </div>
     );
   }
-  const statusCfg = STATUS_CONFIG[req.status];
+  const displayStatus: RequestStatus = (
+    req.status === 'pending_approval' && (req.receiverAcceptedBy || req.receiverApprovedBy)
+  ) ? 'processing' : req.status;
+  const statusCfg = STATUS_CONFIG[displayStatus];
   const StatusIcon = statusCfg.icon;
 
   const handleAction = (action: string) => {

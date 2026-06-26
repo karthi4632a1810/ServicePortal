@@ -66,14 +66,37 @@ export class WorkflowEngine {
 
     switch (step.type) {
       case 'hod':
+        if (step.assigneeEmployeeId) {
+          const userEmpId = String(user.employeeId || '').trim();
+          if (userEmpId && userEmpId === String(step.assigneeEmployeeId).trim()) return true;
+          return namesMatch(user.name, step.assignee);
+        }
         return namesMatch(user.name, step.assignee)
           || (isHod(user.role) && departmentsMatch(user.department, request?.employee?.department));
       case 'reporting_manager':
       case 'specific_user':
+        if (step.assigneeEmployeeId) {
+          const userEmpId = String(user.employeeId || '').trim();
+          if (userEmpId && userEmpId === String(step.assigneeEmployeeId).trim()) return true;
+        }
         return namesMatch(user.name, step.assignee);
       case 'specific_role':
       case 'department_processor':
-        return user.role === step.role || user.role === 'processor';
+        if (request?.assignedToEmployeeId) {
+          const empId = String(request.assignedToEmployeeId).trim();
+          const userEmpId = String(user.employeeId || '').trim();
+          if (empId && userEmpId && empId === userEmpId) return true;
+          if (request.assignedToUserId && String(request.assignedToUserId) === String(user._id)) return true;
+          const assignees = request.assignees || [];
+          if (assignees.some((a) => String(a.employeeId) === userEmpId)) return true;
+          return false;
+        }
+        if (!request?.receiverApprovedBy && step.type === 'department_processor') {
+          if (isSuperAdmin(user.role)) return true;
+          if (!isHod(user.role)) return false;
+          return departmentsMatch(user.department, request?.department || request?.employee?.department);
+        }
+        return user.role === step.role || user.role === 'processor' || isHod(user.role);
       case 'parallel':
         return user.role === step.role;
       default:
@@ -81,7 +104,7 @@ export class WorkflowEngine {
     }
   }
 
-  async processApproval(request, action, { userName, userRole, remarks }) {
+  async processApproval(request, action, { userName, userRole, remarks, forwardToEmployee }) {
     const stepIndex = request.currentStep - 1;
     const step = request.workflow[stepIndex];
     if (!step) throw new Error('No active workflow step');
@@ -113,19 +136,41 @@ export class WorkflowEngine {
       step.comment = remarks || '';
       request.status = 'rejected';
     } else if (action === 'forward') {
-      step.status = 'approved';
-      step.completedAt = new Date();
-      step.completedBy = userName;
-      step.comment = remarks || 'Forwarded';
-      request.currentStep += 1;
+      if (!forwardToEmployee?.id) {
+        throw new Error('Staff ID is required to forward');
+      }
+      step.comment = remarks || `Forwarded to ${forwardToEmployee.name} (${forwardToEmployee.id})`;
+      step.assignee = forwardToEmployee.name;
+      step.assigneeEmployeeId = String(forwardToEmployee.id);
+      step.status = 'pending';
       request.status = 'pending_approval';
     } else if (action === 'request_info') {
+      request.workflow.forEach((s) => {
+        s.status = 'pending';
+        s.completedAt = undefined;
+        s.completedBy = undefined;
+        s.comment = undefined;
+        if (s.type === 'hod') {
+          s.assigneeEmployeeId = undefined;
+          s.assignee = request.employee?.hod;
+        } else {
+          s.assigneeEmployeeId = undefined;
+        }
+      });
+      request.currentStep = 1;
       request.status = 'sent_back';
+      request.receiverApprovedBy = undefined;
+      request.receiverApprovedAt = undefined;
+      request.assignedTo = undefined;
+      request.assignedToEmployeeId = undefined;
+      request.assignedToUserId = undefined;
+      request.assignees = [];
+      request.queueStatus = 'pending';
       request.comments.push({
         id: `c-${uuidv4().slice(0, 8)}`,
         by: userName,
         role: userRole,
-        text: remarks || 'Additional information requested',
+        text: remarks || 'Sent back to employee for correction',
         timestamp: new Date(),
         type: 'action',
       });

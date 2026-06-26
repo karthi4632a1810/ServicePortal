@@ -14,6 +14,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import type { Request } from '../types';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 /* ── Animation imports ───────────────────────────────────────── */
 import { AnimatedCounter } from '../components/animations/AnimatedCounter';
@@ -232,11 +233,17 @@ function TopFormsList({ requests }: { requests: Request[] }) {
 
 /* ── Main dashboard ──────────────────────────────────────────── */
 export function DashboardPage() {
-  const { navigate, requests, dashboardStats: stats, chartData, refreshRequests } = useApp();
+  const { navigate, requests, dashboardStats: stats, chartData, refreshRequests, loadDashboard } = useApp();
   const recent = requests.slice(0, 6);
   const { weekly: CHART_DATA_WEEKLY, status: CHART_DATA_STATUS, department: CHART_DATA_DEPARTMENT } = chartData;
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [showSkeleton, setShowSkeleton] = useState(true);
+
+  const refreshDashboard = React.useCallback(async () => {
+    await Promise.all([refreshRequests(), loadDashboard()]);
+  }, [refreshRequests, loadDashboard]);
+
+  useScreenRefresh(refreshDashboard);
 
   React.useEffect(() => {
     const t = setTimeout(() => setShowSkeleton(false), 800);

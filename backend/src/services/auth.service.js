@@ -44,9 +44,8 @@ export class AuthService {
   async completeLogin(user, req, details = 'Login successful') {
     const token = signToken(user._id);
     const meta = getClientMeta(req);
-    const extras = await this.enrichFromHrms(user);
 
-    await createAuditLog({
+    createAuditLog({
       action: 'LOGIN',
       entity: 'Session',
       entityId: user._id.toString(),
@@ -57,11 +56,11 @@ export class AuthService {
       browser: meta.browser,
       details,
       severity: 'info',
-    });
+    }).catch((err) => console.error('Login audit failed:', err.message));
 
     return {
       token,
-      user: this.formatUser(user, extras),
+      user: this.formatUser(user),
     };
   }
 
@@ -125,8 +124,7 @@ export class AuthService {
   async getMe(userId) {
     const user = await User.findById(userId);
     if (!user) throw new AppError('User not found', 404);
-    const extras = await this.enrichFromHrms(user);
-    return this.formatUser(user, extras);
+    return this.formatUser(user);
   }
 
   async listUsers({ includeInactive = true } = {}) {
@@ -160,14 +158,40 @@ export class AuthService {
     if (!id) throw new AppError('Staff ID is required', 400);
     if (!password) throw new AppError('Password is required', 400);
 
+    if (id === SUPER_ADMIN_STAFF_ID) {
+      const user = await this.findPortalUserByStaffId(id);
+      if (!user || !user.active) throw new AppError('Invalid staff ID or password', 401);
+      const valid = await this.isStaffPortalPasswordValid(user, password);
+      if (!valid) throw new AppError('Invalid staff ID or password', 401);
+      return this.completeStaffLogin(user, id, req);
+    }
+
+    let user = await this.findPortalUserByStaffId(id);
+
+    if (user) {
+      if (!user.active) throw new AppError('Account is disabled. Contact administrator.', 403);
+      const valid = await this.isStaffPortalPasswordValid(user, password);
+      if (!valid) throw new AppError('Invalid staff ID or password', 401);
+
+      if (
+        user.role === 'employee'
+        && !user.portalPasswordChangedAt
+        && this.isDefaultEmployeePassword(password)
+        && !(await bcrypt.compare(config.defaultEmployeePassword, user.password))
+      ) {
+        user.password = await bcrypt.hash(config.defaultEmployeePassword, 10);
+        if (!user.employeeId) user.employeeId = id;
+        await user.save();
+      }
+
+      return this.completeStaffLogin(user, id, req);
+    }
+
     let employeeName = id;
     let department = 'General';
     let designation = null;
 
-    if (id === SUPER_ADMIN_STAFF_ID) {
-      employeeName = SUPER_ADMIN_NAME;
-      department = SUPER_ADMIN_DEPARTMENT;
-    } else if (isHrmsDbConfigured()) {
+    if (isHrmsDbConfigured()) {
       try {
         const emp = await hrmsService.getEmployee(id);
         employeeName = emp.name || id;
@@ -181,56 +205,42 @@ export class AuthService {
       }
     }
 
-    let user = await this.findPortalUserByStaffId(id);
+    if (!this.isDefaultEmployeePassword(password)) {
+      throw new AppError('Invalid staff ID or password', 401);
+    }
 
-    if (!user) {
-      if (!this.isDefaultEmployeePassword(password)) {
-        throw new AppError('Invalid staff ID or password', 401);
-      }
-      const hashed = await bcrypt.hash(config.defaultEmployeePassword, 10);
-      try {
-        user = await User.create({
-          name: employeeName,
-          email: `${id.toLowerCase()}@portal.local`,
-          password: hashed,
-          role: 'employee',
-          department,
-          employeeId: id,
-          initials: getInitials(employeeName),
-          active: true,
-          portalPasswordChangedAt: null,
-        });
-      } catch (err) {
-        if (err.code === 11000) {
-          user = await this.findPortalUserByStaffId(id);
-        } else {
-          throw err;
-        }
+    const hashed = await bcrypt.hash(config.defaultEmployeePassword, 10);
+    try {
+      user = await User.create({
+        name: employeeName,
+        email: `${id.toLowerCase()}@portal.local`,
+        password: hashed,
+        role: 'employee',
+        department,
+        employeeId: id,
+        initials: getInitials(employeeName),
+        active: true,
+        portalPasswordChangedAt: null,
+      });
+    } catch (err) {
+      if (err.code === 11000) {
+        user = await this.findPortalUserByStaffId(id);
+        if (!user) throw new AppError('Invalid staff ID or password', 401);
+        const valid = await this.isStaffPortalPasswordValid(user, password);
+        if (!valid) throw new AppError('Invalid staff ID or password', 401);
+      } else {
+        throw err;
       }
     }
 
-    if (!user) throw new AppError('Invalid staff ID or password', 401);
-    if (!user.active) throw new AppError('Account is disabled. Contact administrator.', 403);
+    return this.completeStaffLogin(user, id, req, { designation });
+  }
 
-    const valid = await this.isStaffPortalPasswordValid(user, password);
-    if (!valid) throw new AppError('Invalid staff ID or password', 401);
-
-    // First portal login with default password — ensure hash is stored for employee accounts.
-    if (
-      user.role === 'employee'
-      && !user.portalPasswordChangedAt
-      && this.isDefaultEmployeePassword(password)
-      && !(await bcrypt.compare(config.defaultEmployeePassword, user.password))
-    ) {
-      user.password = await bcrypt.hash(config.defaultEmployeePassword, 10);
-      if (!user.employeeId) user.employeeId = id;
-      await user.save();
-    }
-
+  async completeStaffLogin(user, staffId, req, extras = {}) {
     const token = signToken(user._id);
     const meta = getClientMeta(req);
 
-    await createAuditLog({
+    createAuditLog({
       action: 'LOGIN',
       entity: 'Session',
       entityId: user._id.toString(),
@@ -239,13 +249,13 @@ export class AuthService {
       department: user.department,
       ip: meta.ip,
       browser: meta.browser,
-      details: `Staff login: ${id}`,
+      details: `Staff login: ${staffId}`,
       severity: 'info',
-    });
+    }).catch((err) => console.error('Login audit failed:', err.message));
 
     return {
       token,
-      user: this.formatUser(user, { designation }),
+      user: this.formatUser(user, extras),
     };
   }
 

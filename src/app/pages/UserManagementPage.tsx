@@ -19,6 +19,7 @@ import {
 import { RippleButton } from '../components/animations/RippleButton';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const IMPORT_EXAMPLE = `[
   { "staffId": "60467", "role": "employee" },
@@ -288,6 +289,8 @@ export function UserManagementPage() {
   useEffect(() => {
     loadUsers();
   }, [loadUsers]);
+
+  useScreenRefresh(loadUsers);
 
   const departments = useMemo(
     () => ['all', ...Array.from(new Set(users.map((u) => u.department).filter(Boolean))).sort()],

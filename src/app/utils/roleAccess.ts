@@ -5,6 +5,7 @@ const EMPLOYEE_PAGES: Page[] = [
   'service-catalog',
   'dynamic-form',
   'my-requests',
+  'my-tasks',
   'request-detail',
   'settings',
 ];
@@ -13,6 +14,7 @@ const HOD_PAGES: Page[] = [
   ...EMPLOYEE_PAGES,
   'dashboard',
   'approvals',
+  'accept',
   'workflow-pipeline',
 ];
 

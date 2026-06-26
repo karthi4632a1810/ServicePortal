@@ -9,6 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import type { Request, RequestStatus } from '../types';
+import { useScreenRefresh } from '../hooks/useScreenRefresh';
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950' },
@@ -124,7 +125,8 @@ const ALL_STATUSES: Array<{ value: string; label: string }> = [
 ];
 
 export function MyRequestsPage() {
-  const { requests, navigate, setSelectedRequest, currentUser } = useApp();
+  const { requests, navigate, setSelectedRequest, currentUser, refreshRequests } = useApp();
+  useScreenRefresh(refreshRequests);
   const isEmployee = currentUser?.role === 'employee';
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
