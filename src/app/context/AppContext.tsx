@@ -235,7 +235,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       setRequests(res.data);
       return;
     }
-    const res = await api.getRequests();
+    const res = await api.getRequests({ limit: '100' });
     setRequests(res.data);
   }, []);
 
@@ -311,9 +311,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
         break;
     }
     updateRequest(res.data);
-    await Promise.allSettled([refreshRequests(), loadDashboard()]);
+    await loadDashboard();
     return res.data;
-  }, [updateRequest, loadDashboard, refreshRequests]);
+  }, [updateRequest, loadDashboard]);
 
 
 

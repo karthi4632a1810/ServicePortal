@@ -8,6 +8,8 @@ const FORM_ICONS: Record<string, string> = {
   'Salary / Travel Advance Request': 'IndianRupee',
   'Miss Punch / Attendance Correction': 'Clock',
   'IT Asset Request': 'Monitor',
+  'Printer Request Form': 'Monitor',
+  'System Request Form': 'Send',
 };
 
 const COLORS = ['#2563EB', '#7C3AED', '#059669', '#D97706', '#DC2626', '#0891B2'];

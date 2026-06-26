@@ -109,33 +109,40 @@ function PipelineCard({
   req,
   accent,
   onClick,
+  isSelected,
 }: {
   req: WFRequest;
   accent: string;
   onClick: () => void;
+  isSelected?: boolean;
 }) {
   const priorityCfg = PRIORITY_CONFIG[req.priority];
   const CatIcon = ICON_MAP[req.categoryIcon] ?? Send;
   const awaitingConfirm = isAwaitingHodConfirm(req);
   const inProgress = req.queueStatus === 'in_progress';
+  const awaitingStart = req.pipelineStatus === 'assigned' && req.queueStatus === 'pending';
 
   return (
     <motion.div
       variants={fadeUp}
-      layout
-      layoutId={req.id}
       whileHover={{ y: -2 }}
       onClick={onClick}
       className={cn(
         'group relative rounded-xl border cursor-pointer overflow-hidden transition-all',
         'shadow-sm hover:shadow-md',
+        isSelected && 'ring-2 ring-primary/50',
         awaitingConfirm
           ? 'bg-amber-50/90 dark:bg-amber-950/35 border-amber-300/80 dark:border-amber-700/60 ring-1 ring-amber-200/80 dark:ring-amber-800/50'
-          : inProgress
-            ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40'
-            : 'bg-card border-border/70 hover:border-primary/25',
+          : awaitingStart
+            ? 'bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/70 dark:border-blue-800/50'
+            : inProgress
+              ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40'
+              : 'bg-card border-border/70 hover:border-primary/25',
       )}
-      style={{ borderLeftWidth: 3, borderLeftColor: awaitingConfirm ? '#D97706' : inProgress ? '#7C3AED' : accent }}
+      style={{
+        borderLeftWidth: 3,
+        borderLeftColor: awaitingConfirm ? '#D97706' : awaitingStart ? '#2563EB' : inProgress ? '#7C3AED' : accent,
+      }}
     >
       {awaitingConfirm && (
         <div className="px-3 py-1.5 bg-amber-100/90 dark:bg-amber-900/50 border-b border-amber-200/80 dark:border-amber-800/50 flex items-center gap-1.5">
@@ -185,6 +192,12 @@ function PipelineCard({
             <span className="px-1.5 py-0.5 rounded-md bg-purple-100 text-purple-700 dark:bg-purple-950 dark:text-purple-300"
               style={{ fontSize: '9px', fontWeight: 700 }}>
               IN PROGRESS
+            </span>
+          )}
+          {awaitingStart && (
+            <span className="px-1.5 py-0.5 rounded-md bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"
+              style={{ fontSize: '9px', fontWeight: 700 }}>
+              AWAITING START
             </span>
           )}
         </div>
@@ -252,12 +265,14 @@ function PipelineColumn({
   onCardClick,
   isCollapsed,
   onToggle,
+  selectedRequestId,
 }: {
   col: ColumnConfig;
   requests: WFRequest[];
   onCardClick: (req: WFRequest) => void;
   isCollapsed: boolean;
   onToggle: () => void;
+  selectedRequestId?: string | null;
 }) {
   const ColIcon = ICON_MAP[col.iconName] ?? Send;
   const overdueCount = requests.filter(r => r.isOverdue).length;
@@ -353,7 +368,13 @@ function PipelineColumn({
             ) : (
               <motion.div variants={stagger(0.05)} initial="hidden" animate="show" className="space-y-3">
                 {sortedRequests.map((req) => (
-                  <PipelineCard key={req.id} req={req} accent={col.accent} onClick={() => onCardClick(req)} />
+                  <PipelineCard
+                    key={req.id}
+                    req={req}
+                    accent={col.accent}
+                    onClick={() => onCardClick(req)}
+                    isSelected={selectedRequestId === req.id}
+                  />
                 ))}
               </motion.div>
             )}
@@ -638,7 +659,16 @@ export function WorkflowPipelinePage() {
     return reqs;
   }, [filter, search, workflowRequests, currentUser]);
 
-  const reqsByStatus = (status: WFPipelineStatus) => filtered.filter(r => r.pipelineStatus === status);
+  const columnRequests = useMemo(() => {
+    const map = new Map<WFPipelineStatus, WFRequest[]>();
+    for (const col of COLUMNS) {
+      const colReqs = filtered.filter((r) => r.pipelineStatus === col.status);
+      map.set(col.status, sortColumnRequests(colReqs, col.status));
+    }
+    return map;
+  }, [filtered]);
+
+  const reqsByStatus = (status: WFPipelineStatus) => columnRequests.get(status) ?? [];
   const toggleCollapse = (status: WFPipelineStatus) => {
     setCollapsed(prev => {
       const next = new Set(prev);
@@ -801,6 +831,7 @@ export function WorkflowPipelinePage() {
                       onCardClick={setSelectedReq}
                       isCollapsed={collapsed.has(col.status)}
                       onToggle={() => toggleCollapse(col.status)}
+                      selectedRequestId={selectedReq?.id}
                     />
                   ))}
                 </div>
@@ -828,45 +859,37 @@ export function WorkflowPipelinePage() {
         currentUser={currentUser}
         onApprove={async (id, action, remarks) => {
           const updated = await performApprovalAction(id, action, remarks);
-          updateRequest(updated);
           setSelectedReq(mapRequestToWorkflow(updated, 0));
-          await refreshRequests();
         }}
         onAcceptProcessing={async (id, remarks) => {
           const res = await api.acceptProcessing(id, remarks);
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
         onAssign={async (id, staffIds) => {
           const res = await api.assignRequest(id, staffIds);
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
         onQueueUpdate={async (id, queueStatus) => {
           const res = await api.updateQueueStatus(id, { queueStatus });
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
         onSubmitForReview={async (id, remarks) => {
           const res = await api.submitForReview(id, remarks);
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
         onConfirmCompletion={async (id, remarks) => {
           const res = await api.confirmCompletion(id, remarks);
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
         onSendBackForRework={async (id, remarks) => {
           const res = await api.sendBackForRework(id, remarks);
           updateRequest(res.data);
           setSelectedReq(mapRequestToWorkflow(res.data, 0));
-          await refreshRequests();
         }}
       />
     </motion.div>

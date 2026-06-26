@@ -17,6 +17,15 @@ export const approvalController = {
     }
   },
 
+  summary: async (req, res, next) => {
+    try {
+      const buckets = await approvalService.getTabSummary(req.user);
+      return successResponse(res, { message: 'Approval summary retrieved', data: buckets });
+    } catch (err) {
+      next(err);
+    }
+  },
+
   approve: async (req, res, next) => {
     try {
       const request = await approvalService.processAction(req.params.requestId, 'approve', {

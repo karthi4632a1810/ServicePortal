@@ -257,6 +257,15 @@ class ApiClient {
     return this.request<import('../types').Request[]>(`/approvals?status=${status}`);
   }
 
+  getApprovalSummary() {
+    return this.request<{
+      pending: import('../types').Request[];
+      approved: import('../types').Request[];
+      rejected: import('../types').Request[];
+      all: import('../types').Request[];
+    }>('/approvals/summary');
+  }
+
   approveRequest(id: string, remarks?: string) {
     return this.request<import('../types').Request>(`/approvals/${id}/approve`, { method: 'POST', body: JSON.stringify({ remarks }) });
   }

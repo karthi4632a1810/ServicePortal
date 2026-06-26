@@ -7,6 +7,7 @@ const router = Router();
 router.use(authenticate);
 router.use(authorize('super_admin', 'admin', 'hod', 'processor', 'it_team', 'hr_team', 'finance_team'));
 
+router.get('/summary', approvalController.summary);
 router.get('/', approvalController.list);
 router.post('/:requestId/approve', approvalController.approve);
 router.post('/:requestId/reject', approvalController.reject);

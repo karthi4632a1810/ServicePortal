@@ -453,7 +453,7 @@ function canSendBack(req: Request, currentUser: Approver | null) {
 }
 
 export function ApprovalsPage({ variant = 'approval' }: { variant?: ApprovalsVariant }) {
-  const { navigate, setSelectedRequest, performApprovalAction, refreshApprovals, refreshRequests, currentUser } = useApp();
+  const { navigate, setSelectedRequest, performApprovalAction, refreshRequests, currentUser } = useApp();
   const [tab, setTab] = useState<ApprovalTab>('pending');
   const [search, setSearch] = useState('');
   const [approvalRequests, setApprovalRequests] = useState<Request[]>([]);
@@ -466,30 +466,30 @@ export function ApprovalsPage({ variant = 'approval' }: { variant?: ApprovalsVar
     requests.filter((r) => matchesVariant(r, variant, activeTab, currentUser))
   ), [variant, currentUser]);
 
-  const loadTabCounts = useCallback(async () => {
-    try {
-      const [pendingRes, approvedRes, rejectedRes, allRes] = await Promise.all([
-        refreshApprovals('pending'),
-        refreshApprovals('approved'),
-        refreshApprovals('rejected'),
-        refreshApprovals('all'),
-      ]);
-      tabCacheRef.current = {
-        pending: filterForVariant(pendingRes, 'pending'),
-        approved: filterForVariant(approvedRes, 'approved'),
-        rejected: filterForVariant(rejectedRes, 'rejected'),
-        all: filterForVariant(allRes, 'all'),
-      };
-      setTabCounts({
-        pending: tabCacheRef.current.pending?.length ?? 0,
-        approved: tabCacheRef.current.approved?.length ?? 0,
-        rejected: tabCacheRef.current.rejected?.length ?? 0,
-        all: tabCacheRef.current.all?.length ?? 0,
-      });
-    } catch {
-      // counts are non-blocking
-    }
-  }, [refreshApprovals, filterForVariant]);
+  const hydrateFromSummary = useCallback((buckets: {
+    pending: Request[];
+    approved: Request[];
+    rejected: Request[];
+    all: Request[];
+  }) => {
+    tabCacheRef.current = {
+      pending: filterForVariant(buckets.pending, 'pending'),
+      approved: filterForVariant(buckets.approved, 'approved'),
+      rejected: filterForVariant(buckets.rejected, 'rejected'),
+      all: filterForVariant(buckets.all, 'all'),
+    };
+    setTabCounts({
+      pending: tabCacheRef.current.pending?.length ?? 0,
+      approved: tabCacheRef.current.approved?.length ?? 0,
+      rejected: tabCacheRef.current.rejected?.length ?? 0,
+      all: tabCacheRef.current.all?.length ?? 0,
+    });
+  }, [filterForVariant]);
+
+  const loadAllTabs = useCallback(async () => {
+    const res = await api.getApprovalSummary();
+    hydrateFromSummary(res.data);
+  }, [hydrateFromSummary]);
 
   const loadApprovals = useCallback(async (activeTab: ApprovalTab = tab) => {
     setLoadError('');
@@ -497,25 +497,20 @@ export function ApprovalsPage({ variant = 'approval' }: { variant?: ApprovalsVar
     if (cached) {
       setApprovalRequests(cached);
       setLoading(false);
-      void loadTabCounts();
       return;
     }
 
     setLoading(true);
     try {
-      const data = await refreshApprovals(activeTab);
-      const filtered = filterForVariant(data, activeTab);
-      tabCacheRef.current[activeTab] = filtered;
-      setApprovalRequests(filtered);
-      setTabCounts((prev) => ({ ...prev, [activeTab]: filtered.length }));
-      void loadTabCounts();
+      await loadAllTabs();
+      setApprovalRequests(tabCacheRef.current[activeTab] ?? []);
     } catch (err) {
       setLoadError(err instanceof Error ? err.message : 'Failed to load approvals');
       setApprovalRequests([]);
     } finally {
       setLoading(false);
     }
-  }, [tab, refreshApprovals, loadTabCounts, filterForVariant]);
+  }, [tab, loadAllTabs]);
 
   const invalidateAndReload = useCallback(async (activeTab: ApprovalTab = tab) => {
     tabCacheRef.current = {};

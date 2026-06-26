@@ -1,0 +1,1 @@
+{"sessionId":"f9c4a8","hypothesisId":"H3","runId":"post-fix","location":"approval.service.js:getTabSummary","message":"single scoped load for all tabs","data":{"totalFetched":7,"findMs":14},"timestamp":1782454254638}

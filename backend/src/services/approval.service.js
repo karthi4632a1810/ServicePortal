@@ -2,7 +2,7 @@ import Request from '../models/Request.js';
 import workflowEngine from './workflowEngine.service.js';
 import hrmsService from './hrms.service.js';
 import { isSuperAdmin, isHod } from '../utils/roles.js';
-import { canAccessRequest, departmentsMatch } from '../utils/requestScope.js';
+import { canAccessRequest, departmentsMatch, mergeRequestScope } from '../utils/requestScope.js';
 import { AppError } from '../utils/response.js';
 
 const APPROVAL_STEP_TYPES = new Set(['hod', 'reporting_manager', 'specific_user', 'specific_role', 'parallel']);
@@ -80,36 +80,54 @@ function mapRequest(r) {
   };
 }
 
+function filterByStatus(accessible, user, status) {
+  if (status === 'pending') {
+    return accessible.filter((req) => userCanApproveNow(user, req));
+  }
+  if (status === 'approved') {
+    return accessible.filter((req) => {
+      if (req.status === 'sent_back') return false;
+      if (!userApprovedInPast(user, req)) return false;
+      return !userCanApproveNow(user, req);
+    });
+  }
+  if (status === 'rejected') {
+    return accessible.filter((req) => {
+      if (req.status === 'sent_back') return false;
+      return req.workflow.some((s) => s.completedBy === user.name && s.status === 'rejected');
+    });
+  }
+  if (status === 'forwarded') {
+    return accessible.filter((req) =>
+      req.comments.some((c) => c.by === user.name && c.text?.toLowerCase().includes('forward')),
+    );
+  }
+  if (status === 'completed') {
+    return accessible.filter((req) => req.status === 'completed');
+  }
+  return accessible;
+}
+
 export class ApprovalService {
+  async loadAccessibleRequests(user) {
+    const scopedQuery = mergeRequestScope({}, user);
+    const allRequests = await Request.find(scopedQuery).sort('-submittedAt');
+    return allRequests.filter((req) => canAccessRequest(user, req));
+  }
+
+  async getTabSummary(user) {
+    const accessible = await this.loadAccessibleRequests(user);
+    return {
+      pending: filterByStatus(accessible, user, 'pending').map(mapRequest),
+      approved: filterByStatus(accessible, user, 'approved').map(mapRequest),
+      rejected: filterByStatus(accessible, user, 'rejected').map(mapRequest),
+      all: accessible.map(mapRequest),
+    };
+  }
+
   async getPendingForUser(user, { status = 'pending', page = 1, limit = 20 } = {}) {
-    const allRequests = await Request.find({}).sort('-submittedAt');
-    let filtered = allRequests;
-
-    if (status === 'pending') {
-      filtered = allRequests.filter((req) => userCanApproveNow(user, req));
-    } else if (status === 'approved') {
-      filtered = allRequests.filter((req) => {
-        if (req.status === 'sent_back') return false;
-        if (!userApprovedInPast(user, req)) return false;
-        // Still waiting on your approval — show only under Pending, not here
-        return !userCanApproveNow(user, req);
-      });
-    } else if (status === 'rejected') {
-      filtered = allRequests.filter((req) => {
-        if (req.status === 'sent_back') return false;
-        return req.workflow.some((s) => s.completedBy === user.name && s.status === 'rejected');
-      });
-    } else if (status === 'forwarded') {
-      filtered = allRequests.filter((req) =>
-        req.comments.some((c) => c.by === user.name && c.text?.toLowerCase().includes('forward'))
-      );
-    } else if (status === 'completed') {
-      filtered = allRequests.filter((req) => req.status === 'completed');
-    } else if (status === 'all') {
-      filtered = allRequests;
-    }
-
-    filtered = filtered.filter((req) => canAccessRequest(user, req));
+    const accessible = await this.loadAccessibleRequests(user);
+    const filtered = filterByStatus(accessible, user, status);
 
     const pageNum = parseInt(page, 10);
     const limitNum = parseInt(limit, 10);
