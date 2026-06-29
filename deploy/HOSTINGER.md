@@ -86,15 +86,15 @@ Shared Hostinger Docker (ports 27017/5000/3000 already used by other apps):
 bash deploy/deploy.sh --hostinger --seed
 ```
 
-In **Hostinger Docker Manager** → **serviceportal** → use `deploy/docker-compose.hostinger-manager.yml` in the **.yaml editor** (includes Traefik labels for `paper.mapims.edu.in`).
+Traefik routes `https://paper.mapims.edu.in` automatically (labels in `docker-compose.hostinger.yml`). Port **8093** remains for direct/local testing.
 
-**Requires:** Traefik project running in Docker Manager (default Hostinger VPS template).
+**Requires:** Traefik project in Docker Manager (`docker network ls | grep traefik`).
 
-**Env vars** in Docker Manager (same as `.env` on server).
+In **Hostinger Docker Manager** → paste **`docker-compose.yml`** + **`docker-compose.hostinger.yml`** in the **.yaml editor**, or deploy via terminal:
 
-After deploy, Traefik routes `https://paper.mapims.edu.in` → `paperzero-nginx` (no port 8093 needed for public access).
-
-Fallback direct port (SSH deploy only): `APP_PORT=8093` in `docker-compose.hostinger.yml`.
+```bash
+docker compose -f docker-compose.yml -f docker-compose.hostinger.yml up -d --build
+```
 
 Dedicated VPS (nginx on 80/443; optional Caddy: `--profile caddy`):
 

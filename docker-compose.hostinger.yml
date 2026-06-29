@@ -1,5 +1,8 @@
-# Hostinger Docker Manager — shared VPS (many projects on same server)
-# Nginx on APP_PORT (default 8093) → frontend (internal) → backend (internal)
+# Hostinger shared VPS — nginx on APP_PORT + Traefik domain routing
+# Usage: docker compose -f docker-compose.yml -f docker-compose.hostinger.yml up -d --build
+#
+# Requires Traefik project in Docker Manager (traefik-proxy network)
+# DNS: paper.mapims.edu.in → VPS IP
 
 services:
   frontend:
@@ -22,6 +25,19 @@ services:
       interval: 30s
       timeout: 5s
       retries: 3
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.paperzero.rule=Host(`paper.mapims.edu.in`)
+      - traefik.http.routers.paperzero.entrypoints=websecure
+      - traefik.http.routers.paperzero.tls.certresolver=letsencrypt
+      - traefik.http.services.paperzero.loadbalancer.server.port=80
+      - traefik.http.routers.paperzero-http.rule=Host(`paper.mapims.edu.in`)
+      - traefik.http.routers.paperzero-http.entrypoints=web
+      - traefik.http.routers.paperzero-http.middlewares=paperzero-redirect-https
+      - traefik.http.middlewares.paperzero-redirect-https.redirectscheme.scheme=https
+    networks:
+      - default
+      - traefik-proxy
 
   seed:
     env_file:
@@ -29,3 +45,7 @@ services:
         required: false
       - path: backend/.env
         required: false
+
+networks:
+  traefik-proxy:
+    external: true
