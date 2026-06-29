@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { motion, useInView } from 'motion/react';
+import { motion, useInView, useReducedMotion } from 'motion/react';
 import { easeOutExpo } from '../../lib/animations';
 
 interface AnimatedCounterProps {
@@ -23,10 +23,15 @@ export function AnimatedCounter({
 }: AnimatedCounterProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref, { once });
-  const [count, setCount] = useState(0);
+  const reducedMotion = useReducedMotion();
+  const [count, setCount] = useState(reducedMotion ? target : 0);
   const rafRef = useRef<number>(0);
 
   useEffect(() => {
+    if (reducedMotion) {
+      setCount(target);
+      return;
+    }
     if (!inView) return;
 
     const startTime = performance.now();
@@ -47,7 +52,7 @@ export function AnimatedCounter({
 
     rafRef.current = requestAnimationFrame(animate);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [inView, target, duration]);
+  }, [inView, target, duration, reducedMotion]);
 
   const formatted =
     decimals > 0
@@ -57,8 +62,8 @@ export function AnimatedCounter({
   return (
     <motion.span
       ref={ref}
-      initial={{ opacity: 0, y: 8 }}
-      animate={inView ? { opacity: 1, y: 0 } : {}}
+      initial={reducedMotion ? false : { opacity: 0, y: 8 }}
+      animate={reducedMotion ? undefined : (inView ? { opacity: 1, y: 0 } : {})}
       transition={{ duration: 0.4 }}
       className={className}
     >

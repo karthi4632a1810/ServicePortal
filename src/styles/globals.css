@@ -110,6 +110,17 @@ input, select, textarea {
   font-size: 16px;
 }
 
+.dark input:-webkit-autofill,
+.dark input:-webkit-autofill:hover,
+.dark input:-webkit-autofill:focus,
+.dark textarea:-webkit-autofill,
+.dark select:-webkit-autofill {
+  -webkit-text-fill-color: var(--foreground);
+  -webkit-box-shadow: 0 0 0 1000px var(--input-background) inset;
+  box-shadow: 0 0 0 1000px var(--input-background) inset;
+  caret-color: var(--foreground);
+}
+
 @media (min-width: 640px) {
   input, select, textarea {
     font-size: inherit;

@@ -4,6 +4,7 @@ import {
   useMotionValue,
   useSpring,
   useTransform,
+  useReducedMotion,
 } from 'motion/react';
 import { cn } from '../ui/utils';
 
@@ -16,7 +17,7 @@ interface TiltCardProps {
   perspective?: number;
 }
 
-export function TiltCard({
+function TiltCardInteractive({
   children,
   className,
   maxTilt = 8,
@@ -74,7 +75,6 @@ export function TiltCard({
     >
       {children}
 
-      {/* Glare layer */}
       {glare && (
         <motion.div
           className="pointer-events-none absolute inset-0 rounded-[inherit] overflow-hidden"
@@ -94,4 +94,14 @@ export function TiltCard({
       )}
     </motion.div>
   );
+}
+
+export function TiltCard(props: TiltCardProps) {
+  const reducedMotion = useReducedMotion();
+
+  if (reducedMotion) {
+    return <div className={cn('relative', props.className)}>{props.children}</div>;
+  }
+
+  return <TiltCardInteractive {...props} />;
 }

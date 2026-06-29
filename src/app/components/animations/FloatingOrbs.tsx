@@ -1,5 +1,5 @@
 import React from 'react';
-import { motion } from 'motion/react';
+import { motion, useReducedMotion } from 'motion/react';
 
 interface OrbConfig {
   size: number;
@@ -26,6 +26,9 @@ interface FloatingOrbsProps {
 }
 
 export function FloatingOrbs({ orbs = DEFAULT_ORBS, className }: FloatingOrbsProps) {
+  const reducedMotion = useReducedMotion();
+  if (reducedMotion) return null;
+
   return (
     <div
       className={`absolute inset-0 overflow-hidden pointer-events-none ${className ?? ''}`}

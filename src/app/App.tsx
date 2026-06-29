@@ -9,6 +9,8 @@ import { ProtectedRoute } from './components/auth/ProtectedRoute';
 import { AppSidebar } from './components/layout/AppSidebar';
 import { AppHeader } from './components/layout/AppHeader';
 import { LoadingScreen } from './components/animations/LoadingScreen';
+import { MotionProvider } from './components/MotionProvider';
+import { useAnimationsEnabled } from './hooks/useAnimationsEnabled';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { EmployeePortalPage } from './pages/EmployeePortalPage';
@@ -49,6 +51,7 @@ const PAGE_VARIANTS = {
 
 function PageRouter() {
   const { currentPage, currentUser, navigate } = useApp();
+  const animationsEnabled = useAnimationsEnabled();
 
   React.useEffect(() => {
     if (currentUser && !canAccessPage(currentUser.role, currentPage)) {
@@ -81,6 +84,10 @@ function PageRouter() {
     }
   };
 
+  if (!animationsEnabled) {
+    return <div className="flex-1">{renderPage()}</div>;
+  }
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       <motion.div
@@ -99,6 +106,24 @@ function PageRouter() {
 }
 
 function AdminShell() {
+  const animationsEnabled = useAnimationsEnabled();
+
+  if (!animationsEnabled) {
+    return (
+      <div className="h-screen w-full overflow-hidden bg-background">
+        <div className="flex h-full w-full max-w-[1920px] mx-auto overflow-hidden">
+          <AppSidebar />
+          <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+            <AppHeader />
+            <main className="flex-1 overflow-auto">
+              <PageRouter />
+            </main>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="h-screen w-full overflow-hidden bg-background">
       <motion.div
@@ -161,7 +186,12 @@ function AppRoutes() {
 }
 
 function AppContent() {
-  const [ready, setReady] = useState(false);
+  const animationsEnabled = useAnimationsEnabled();
+  const [ready, setReady] = useState(!animationsEnabled);
+
+  useEffect(() => {
+    if (!animationsEnabled) setReady(true);
+  }, [animationsEnabled]);
 
   return (
     <>
@@ -169,10 +199,14 @@ function AppContent() {
         {!ready ? (
           <div key="loading" className="h-screen w-full bg-background">
             <div className="h-full w-full max-w-[1920px] mx-auto">
-              <LoadingScreen onComplete={() => setReady(true)} duration={2600} />
+              <LoadingScreen
+                onComplete={() => setReady(true)}
+                duration={animationsEnabled ? 2600 : 0}
+                skipAnimation={!animationsEnabled}
+              />
             </div>
           </div>
-        ) : (
+        ) : animationsEnabled ? (
           <motion.div
             key="app"
             className="h-full w-full"
@@ -182,6 +216,10 @@ function AppContent() {
           >
             <AppRoutes />
           </motion.div>
+        ) : (
+          <div key="app" className="h-full w-full">
+            <AppRoutes />
+          </div>
         )}
       </AnimatePresence>
 
@@ -206,7 +244,9 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppProvider>
-        <AppContent />
+        <MotionProvider>
+          <AppContent />
+        </MotionProvider>
       </AppProvider>
     </BrowserRouter>
   );

@@ -21,7 +21,7 @@ export function PasswordInput({
         type={visible ? 'text' : 'password'}
         disabled={disabled}
         className={cn(
-          'w-full h-10 pr-10 px-3 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50',
+          'w-full h-10 pr-10 px-3 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary disabled:opacity-50',
           inputClassName,
         )}
       />

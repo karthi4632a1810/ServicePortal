@@ -7,6 +7,7 @@ import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 interface LoadingScreenProps {
   onComplete?: () => void;
   duration?: number;
+  skipAnimation?: boolean;
 }
 
 const LOADING_STEPS = [
@@ -16,12 +17,18 @@ const LOADING_STEPS = [
   'Ready!',
 ];
 
-export function LoadingScreen({ onComplete, duration = 2800 }: LoadingScreenProps) {
+export function LoadingScreen({ onComplete, duration = 2800, skipAnimation = false }: LoadingScreenProps) {
   const [step, setStep] = useState(0);
   const [progress, setProgress] = useState(0);
   const [done, setDone] = useState(false);
 
   useEffect(() => {
+    if (skipAnimation || duration <= 0) {
+      onComplete?.();
+      setDone(true);
+      return;
+    }
+
     const stepDuration = duration / LOADING_STEPS.length;
 
     const stepInterval = setInterval(() => {
@@ -48,7 +55,9 @@ export function LoadingScreen({ onComplete, duration = 2800 }: LoadingScreenProp
       clearInterval(progressInterval);
       clearTimeout(timeout);
     };
-  }, [duration, onComplete]);
+  }, [duration, onComplete, skipAnimation]);
+
+  if (skipAnimation || duration <= 0) return null;
 
   return (
     <AnimatePresence>

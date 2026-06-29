@@ -587,7 +587,7 @@ export function SettingsPage() {
                             min={type === 'number' ? 1 : undefined}
                             max={type === 'number' ? 720 : undefined}
                             className={cn(
-                              'w-full h-9 px-3 rounded-lg border border-border text-foreground outline-none transition-all',
+                              'w-full h-9 px-3 rounded-lg border border-border text-foreground placeholder:text-muted-foreground outline-none transition-all',
                               canEditOrganization
                                 ? 'bg-input-background focus:ring-2 focus:ring-primary/30'
                                 : 'bg-muted text-muted-foreground cursor-not-allowed',
