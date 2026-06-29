@@ -1,0 +1,20 @@
+# Hostinger Docker Manager — shared VPS (many projects on same server)
+# Avoids ports used by other apps: 27017, 5000, 3000, 8085-8092, 5010-5015
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.hostinger.yml up -d --build
+#   bash deploy/deploy.sh --hostinger --seed
+#
+# In Hostinger Docker Manager: map paper.mapims.edu.in → frontend port APP_PORT (default 8093)
+
+services:
+  frontend:
+    ports:
+      - "${APP_PORT:-8093}:80"
+
+  seed:
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false

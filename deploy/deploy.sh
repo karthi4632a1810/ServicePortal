@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Build and start PaperZero (production)
 # Usage:
-#   bash deploy/deploy.sh          # update + start
-#   bash deploy/deploy.sh --seed   # first deploy: also seed MongoDB + forms
+#   bash deploy/deploy.sh --hostinger --seed   # Hostinger shared VPS (port 8093)
+#   bash deploy/deploy.sh --seed               # Dedicated VPS with Caddy SSL
 
 set -euo pipefail
 
@@ -11,17 +11,25 @@ cd "$ROOT"
 
 COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
 SEED=false
+HOSTINGER=false
 
 for arg in "$@"; do
   case "$arg" in
     --seed) SEED=true ;;
+    --hostinger) HOSTINGER=true ;;
     -h|--help)
-      echo "Usage: bash deploy/deploy.sh [--seed]"
+      echo "Usage: bash deploy/deploy.sh [--hostinger] [--seed]"
+      echo "  --hostinger  Shared Hostinger Docker (no 27017/5000/3000, app on APP_PORT)"
+      echo "  --seed       First deploy: seed MongoDB + forms"
       exit 0
       ;;
     *) echo "Unknown option: $arg"; exit 1 ;;
   esac
 done
+
+if $HOSTINGER; then
+  COMPOSE="docker compose -f docker-compose.yml -f docker-compose.hostinger.yml"
+fi
 
 if [[ ! -f .env ]]; then
   echo "Missing .env — copy .env.production.example to .env and edit it."
@@ -54,9 +62,18 @@ fi
 
 echo ""
 DOMAIN=$(grep -E '^DOMAIN=' .env | cut -d= -f2- | tr -d '\r"')
-echo "Deploy complete."
-echo "  Site:  https://${DOMAIN}"
-echo "  Health: curl -s https://${DOMAIN}/api/health"
+APP_PORT=$(grep -E '^APP_PORT=' .env 2>/dev/null | cut -d= -f2- | tr -d '\r"' || echo "8093")
+if $HOSTINGER; then
+  echo "Deploy complete (Hostinger mode)."
+  echo "  App port on server: ${APP_PORT}"
+  echo "  Domain: https://${DOMAIN}"
+  echo "  In Hostinger Docker Manager → ServicePortal → bind ${DOMAIN} to port ${APP_PORT}"
+  echo "  Test: curl -s http://127.0.0.1:${APP_PORT}/api/health"
+else
+  echo "Deploy complete."
+  echo "  Site:  https://${DOMAIN}"
+  echo "  Health: curl -s https://${DOMAIN}/api/health"
+fi
 echo ""
 echo "Logs:  $COMPOSE logs -f"
 echo "Stop:  $COMPOSE down"

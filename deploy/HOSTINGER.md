@@ -77,12 +77,32 @@ In cPanel → Remote MySQL®, allow your **VPS public IP**.
 
 **Step 5 — First deploy + seed**
 
+Shared Hostinger Docker (ports 27017/5000/3000 already used by other apps):
+
+```bash
+# Add to .env:
+# APP_PORT=8093
+
+bash deploy/deploy.sh --hostinger --seed
+```
+
+In **Hostinger Docker Manager** → **ServicePortal** → map **paper.mapims.edu.in** to port **8093**.
+
+Dedicated VPS (empty server, Caddy SSL):
+
 ```bash
 bash deploy/deploy.sh --seed
 ```
 
 **Step 6 — Verify**
 
+Hostinger shared:
+```bash
+curl -s http://127.0.0.1:8093/api/health
+curl -s https://paper.mapims.edu.in/api/health
+```
+
+Dedicated VPS:
 ```bash
 curl -s https://paper.mapims.edu.in/api/health
 curl -s https://paper.mapims.edu.in/api/forms | head
@@ -101,27 +121,55 @@ bash deploy/update.sh
 
 ---
 
+## D. Port map on your server (avoid conflicts)
+
+| Port | Used by |
+|------|---------|
+| 27017, 5000, 3000 | **mrd_cl** |
+| 8085, 5010 | ambulance_qr |
+| 8088, 5011 | gen_cl |
+| 8089, 5012 | gen_cl_dental |
+| 8090, 5013 | tms |
+| 8091, 5014 | pfs |
+| 8092, 5015 | pg_cl |
+| **8093** | **PaperZero (ServicePortal)** ← use this |
+
+PaperZero mongo/backend stay **internal only** (no host ports).
+
+---
+
 ## Useful commands
 
+Hostinger shared (`--hostinger`):
+
 ```bash
-# Logs (all services)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f
+COMPOSE="docker compose -f docker-compose.yml -f docker-compose.hostinger.yml"
 
-# Logs (backend only)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml logs -f backend
+# Logs
+$COMPOSE logs -f
 
-# Restart everything
-docker compose -f docker-compose.yml -f docker-compose.prod.yml restart
+# Restart
+$COMPOSE restart
 
-# Stop everything
-docker compose -f docker-compose.yml -f docker-compose.prod.yml down
+# Stop
+$COMPOSE down
 
-# Re-seed forms only (keeps users)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml exec backend \
-  node backend/scripts/seedMongoDb.js --skip-users
+# Re-seed forms
+$COMPOSE exec backend node backend/scripts/seedMongoDb.js --skip-users
 
 # Full re-seed
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile seed run --rm seed
+$COMPOSE --profile seed run --rm seed
+```
+
+Dedicated VPS:
+
+```bash
+COMPOSE="docker compose -f docker-compose.yml -f docker-compose.prod.yml"
+$COMPOSE logs -f
+$COMPOSE restart
+$COMPOSE down
+$COMPOSE exec backend node backend/scripts/seedMongoDb.js --skip-users
+$COMPOSE --profile seed run --rm seed
 ```
 
 ---
