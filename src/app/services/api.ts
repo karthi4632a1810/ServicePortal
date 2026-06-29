@@ -74,6 +74,16 @@ class ApiClient {
     });
   }
 
+  updateNotificationPreferences(data: Partial<import('../utils/notificationPreferences').NotificationPreferences>) {
+    return this.request<import('../utils/notificationPreferences').NotificationPreferences>(
+      '/auth/me/notification-preferences',
+      {
+        method: 'PATCH',
+        body: JSON.stringify(data),
+      },
+    );
+  }
+
   logout() {
     return this.request<null>('/auth/logout', { method: 'POST' });
   }
@@ -329,6 +339,10 @@ class ApiClient {
   }
 
   // Departments
+  getPortalDepartments() {
+    return this.request<Array<{ code: string; name: string; queueName?: string; icon?: string }>>('/departments');
+  }
+
   getDepartmentQueue(code: string, status?: string) {
     const qs = status ? `?status=${status}` : '';
     return this.request<Array<Record<string, string>>>(`/departments/${code}/queue${qs}`);
@@ -337,6 +351,18 @@ class ApiClient {
   // Notifications
   getNotifications() {
     return this.request<Array<Record<string, unknown>>>('/notifications');
+  }
+
+  // Settings
+  getOrganizationSettings() {
+    return this.request<import('../types').OrganizationSettings>('/settings/organization');
+  }
+
+  updateOrganizationSettings(data: import('../types').OrganizationSettings) {
+    return this.request<import('../types').OrganizationSettings>('/settings/organization', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
   }
 
   // Upload

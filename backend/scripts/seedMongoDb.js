@@ -26,6 +26,7 @@ import Department from '../src/models/Department.js';
 import Role from '../src/models/Role.js';
 import Permission from '../src/models/Permission.js';
 import WorkflowTemplate from '../src/models/WorkflowTemplate.js';
+import PortalSettings from '../src/models/PortalSettings.js';
 import formService from '../src/services/form.service.js';
 import { loadConfigFile } from '../src/utils/fileLoader.js';
 import { syncDemoUsers } from '../src/seeds/syncUsers.js';
@@ -76,6 +77,20 @@ async function seedConfigData() {
     });
   }
   console.log(`  workflow templates: ${workflows.length}`);
+
+  try {
+    const [orgDefaults] = await loadConfigFile('organization.json');
+    if (orgDefaults) {
+      await PortalSettings.findOneAndUpdate(
+        { key: 'organization' },
+        { key: 'organization', organization: orgDefaults },
+        { upsert: true },
+      );
+      console.log('  organization settings: 1');
+    }
+  } catch {
+    console.log('  organization settings: skipped (no organization.json)');
+  }
 }
 
 async function seedForms() {

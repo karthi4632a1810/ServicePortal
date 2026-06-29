@@ -625,6 +625,7 @@ export function WorkflowPipelinePage() {
   const workflowRequests = useMemo(() => requestsToWorkflow(requests), [requests]);
   const [view, setView] = useState<'pipeline' | 'timeline' | 'analytics'>('pipeline');
   const [filter, setFilter] = useState<FilterKey>('all');
+  const [departmentFilter, setDepartmentFilter] = useState('all');
   const [search, setSearch] = useState('');
   const [selectedReq, setSelectedReq] = useState<WFRequest | null>(null);
   const [collapsed, setCollapsed] = useState<Set<WFPipelineStatus>>(new Set(['rejected']));
@@ -633,6 +634,12 @@ export function WorkflowPipelinePage() {
   useScreenRefresh(refreshRequests);
 
   const isLoading = appLoading;
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  const departments = useMemo(
+    () => Array.from(new Set(workflowRequests.map((r) => r.employeeDept).filter(Boolean))).sort(),
+    [workflowRequests],
+  );
 
   /* apply filters */
   const filtered = useMemo(() => {
@@ -647,6 +654,9 @@ export function WorkflowPipelinePage() {
         || r.assignedInitials === currentUser.initials
       )
     );
+    if (isSuperAdmin && departmentFilter !== 'all') {
+      reqs = reqs.filter((r) => r.employeeDept === departmentFilter);
+    }
     if (search) {
       const q = search.toLowerCase();
       reqs = reqs.filter(r =>
@@ -657,7 +667,7 @@ export function WorkflowPipelinePage() {
       );
     }
     return reqs;
-  }, [filter, search, workflowRequests, currentUser]);
+  }, [filter, search, workflowRequests, currentUser, isSuperAdmin, departmentFilter]);
 
   const columnRequests = useMemo(() => {
     const map = new Map<WFPipelineStatus, WFRequest[]>();
@@ -733,7 +743,7 @@ export function WorkflowPipelinePage() {
 
             <motion.button
               whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => { setIsLoading(true); setTimeout(() => setIsLoading(false), 700); }}
+              onClick={() => void refreshRequests()}
               className="size-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
             >
               <RefreshCw className="size-4" />
@@ -797,6 +807,23 @@ export function WorkflowPipelinePage() {
               </motion.button>
             ))}
           </div>
+
+          {isSuperAdmin && (
+            <div className="flex items-center gap-1.5 ml-auto">
+              <Building2 className="size-3.5 text-muted-foreground shrink-0" />
+              <select
+                value={departmentFilter}
+                onChange={(e) => setDepartmentFilter(e.target.value)}
+                className="h-8 px-2.5 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ fontSize: '11px', maxWidth: 220 }}
+              >
+                <option value="all">All departments</option>
+                {departments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </div>
+          )}
         </div>
       </div>
 

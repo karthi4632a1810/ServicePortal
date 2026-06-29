@@ -89,6 +89,19 @@ const preferencesSchema = z.object({
   }),
 });
 
+const notificationPreferencesSchema = z.object({
+  body: z.object({
+    emailSubmitted: z.boolean().optional(),
+    emailApproval: z.boolean().optional(),
+    emailApproved: z.boolean().optional(),
+    emailRejected: z.boolean().optional(),
+    emailCompleted: z.boolean().optional(),
+    emailReminder: z.boolean().optional(),
+    inAppRealtime: z.boolean().optional(),
+    emailDailyDigest: z.boolean().optional(),
+  }),
+});
+
 export const authController = {
   login: async (req, res, next) => {
     try {
@@ -242,6 +255,18 @@ export const authController = {
       const parsed = preferencesSchema.parse({ body: req.body });
       const preferences = await authService.updatePreferences(req.user._id, parsed.body);
       return successResponse(res, { message: 'Preferences updated', data: preferences });
+    } catch (err) {
+      if (err instanceof AppError) return next(err);
+      if (err.name === 'ZodError') return next(new AppError(err.errors.map((e) => e.message).join(', '), 400));
+      next(err);
+    }
+  },
+
+  updateNotificationPreferences: async (req, res, next) => {
+    try {
+      const parsed = notificationPreferencesSchema.parse({ body: req.body });
+      const notificationPreferences = await authService.updateNotificationPreferences(req.user._id, parsed.body);
+      return successResponse(res, { message: 'Notification preferences updated', data: notificationPreferences });
     } catch (err) {
       if (err instanceof AppError) return next(err);
       if (err.name === 'ZodError') return next(new AppError(err.errors.map((e) => e.message).join(', '), 400));

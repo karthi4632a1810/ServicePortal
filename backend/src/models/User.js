@@ -17,10 +17,14 @@ const userSchema = new mongoose.Schema(
     active: { type: Boolean, default: true },
     portalPasswordChangedAt: { type: Date, default: null },
     notificationPreferences: {
+      emailSubmitted: { type: Boolean, default: true },
       emailApproval: { type: Boolean, default: true },
-      emailCompleted: { type: Boolean, default: true },
+      emailApproved: { type: Boolean, default: true },
       emailRejected: { type: Boolean, default: true },
+      emailCompleted: { type: Boolean, default: false },
       emailReminder: { type: Boolean, default: true },
+      inAppRealtime: { type: Boolean, default: true },
+      emailDailyDigest: { type: Boolean, default: false },
     },
     preferences: {
       theme: { type: String, enum: ['light', 'dark', 'system'], default: 'light' },

@@ -74,6 +74,20 @@ export class AuthService {
     };
   }
 
+  formatNotificationPreferences(user) {
+    const n = user.notificationPreferences || {};
+    return {
+      emailSubmitted: n.emailSubmitted ?? true,
+      emailApproval: n.emailApproval ?? true,
+      emailApproved: n.emailApproved ?? true,
+      emailRejected: n.emailRejected ?? true,
+      emailCompleted: n.emailCompleted ?? false,
+      emailReminder: n.emailReminder ?? true,
+      inAppRealtime: n.inAppRealtime ?? true,
+      emailDailyDigest: n.emailDailyDigest ?? false,
+    };
+  }
+
   formatUser(user, extras = {}) {
     const employeeId = user.employeeId || null;
     const photoUrl = getStaffPhotoUrl(employeeId);
@@ -89,7 +103,32 @@ export class AuthService {
       employeeId,
       active: user.active !== false,
       preferences: this.formatPreferences(user),
+      notificationPreferences: this.formatNotificationPreferences(user),
     };
+  }
+
+  async updateNotificationPreferences(userId, patch) {
+    const allowed = [
+      'emailSubmitted',
+      'emailApproval',
+      'emailApproved',
+      'emailRejected',
+      'emailCompleted',
+      'emailReminder',
+      'inAppRealtime',
+      'emailDailyDigest',
+    ];
+    const update = {};
+    for (const key of allowed) {
+      if (patch[key] !== undefined) update[`notificationPreferences.${key}`] = patch[key];
+    }
+    if (!Object.keys(update).length) {
+      throw new AppError('No valid notification preferences provided', 400);
+    }
+
+    const user = await User.findByIdAndUpdate(userId, { $set: update }, { new: true });
+    if (!user) throw new AppError('User not found', 404);
+    return this.formatNotificationPreferences(user);
   }
 
   async updatePreferences(userId, patch) {

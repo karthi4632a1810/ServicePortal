@@ -11,6 +11,10 @@ import {
   type UserPreferences,
   type ThemePreference,
 } from '../utils/userPreferences';
+import {
+  DEFAULT_NOTIFICATION_PREFERENCES,
+  type NotificationPreferences,
+} from '../utils/notificationPreferences';
 
 const EMPTY_DASHBOARD: DashboardStats = {
 
@@ -74,6 +78,8 @@ interface AppContextValue {
   preferences: UserPreferences;
 
   updatePreferences: (patch: Partial<UserPreferences>) => Promise<void>;
+
+  updateNotificationPreferences: (patch: Partial<NotificationPreferences>) => Promise<void>;
 
   setTheme: (theme: ThemePreference) => Promise<void>;
 
@@ -405,6 +411,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     }
   }, [preferences, applyPreferences, isAuthenticated]);
 
+  const updateNotificationPreferences = useCallback(async (patch: Partial<NotificationPreferences>) => {
+    if (!currentUser) return;
+
+    const previous = currentUser.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES;
+    const optimistic = { ...previous, ...patch };
+    setCurrentUser({ ...currentUser, notificationPreferences: optimistic });
+
+    if (isAuthenticated) {
+      try {
+        const res = await api.updateNotificationPreferences(patch);
+        setCurrentUser((user) => (user ? { ...user, notificationPreferences: res.data } : user));
+      } catch {
+        setCurrentUser((user) => (user ? { ...user, notificationPreferences: previous } : user));
+        throw new Error('Failed to save notification preferences');
+      }
+    }
+  }, [currentUser, isAuthenticated]);
+
   const setTheme = useCallback(async (theme: ThemePreference) => {
     await updatePreferences({ theme });
   }, [updatePreferences]);
@@ -542,6 +566,8 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       preferences,
 
       updatePreferences,
+
+      updateNotificationPreferences,
 
       setTheme,
 

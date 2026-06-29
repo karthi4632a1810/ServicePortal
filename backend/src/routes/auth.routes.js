@@ -8,6 +8,7 @@ router.post('/login', authController.login);
 router.post('/employee-login', authController.employeeLogin);
 router.get('/me', authenticate, authController.me);
 router.patch('/me/preferences', authenticate, authController.updatePreferences);
+router.patch('/me/notification-preferences', authenticate, authController.updateNotificationPreferences);
 router.post('/me/change-password', authenticate, authController.changePassword);
 router.post('/logout', authenticate, authController.logout);
 router.get('/users', authenticate, authorize('super_admin'), authController.listUsers);

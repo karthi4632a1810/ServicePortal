@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import {
@@ -10,8 +10,12 @@ import { cn } from '../components/ui/utils';
 import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
 import { isFixedSuperAdmin, getRoleLabel } from '../utils/roleAccess';
 import { ACCENT_COLORS } from '../utils/userPreferences';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '../utils/notificationPreferences';
+import type { NotificationPreferences } from '../utils/notificationPreferences';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
+import { api } from '../services/api';
+import type { OrganizationSettings } from '../types';
 
 const SECTIONS = [
   { id: 'profile', label: 'Profile', icon: User },
@@ -59,7 +63,7 @@ function ToggleSetting({
 
 export function SettingsPage() {
   const {
-    currentUser, preferences, setTheme, updatePreferences, isAuthenticated,
+    currentUser, preferences, setTheme, updatePreferences, updateNotificationPreferences, isAuthenticated,
     login, logout, changePassword, apiLoginUsers,
   } = useApp();
   const routerNavigate = useNavigate();
@@ -75,9 +79,68 @@ export function SettingsPage() {
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState(false);
   const [changingPassword, setChangingPassword] = useState(false);
+  const [orgSettings, setOrgSettings] = useState<OrganizationSettings>({
+    companyName: '',
+    companyDomain: '',
+    defaultSlaHours: 24,
+    adminEmail: '',
+  });
+  const [orgLoading, setOrgLoading] = useState(false);
+  const [orgSaving, setOrgSaving] = useState(false);
+  const [orgError, setOrgError] = useState('');
+  const [orgSaved, setOrgSaved] = useState(false);
+  const [notifError, setNotifError] = useState('');
 
   const user = currentUser ?? apiLoginUsers[0];
+  const notificationPrefs = currentUser?.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES;
+
+  const handleNotificationChange = async (key: keyof NotificationPreferences, value: boolean) => {
+    if (!isAuthenticated) return;
+    setNotifError('');
+    try {
+      await updateNotificationPreferences({ [key]: value });
+    } catch (err) {
+      setNotifError(err instanceof Error ? err.message : 'Failed to save notification preferences');
+    }
+  };
   const superAdminLocked = isFixedSuperAdmin(user);
+  const canEditOrganization = user.role === 'super_admin' || user.role === 'admin';
+
+  useEffect(() => {
+    if (activeSection !== 'organization' || !isAuthenticated) return;
+    let cancelled = false;
+    setOrgLoading(true);
+    setOrgError('');
+    void api.getOrganizationSettings()
+      .then((res) => {
+        if (!cancelled) setOrgSettings(res.data);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setOrgError(err instanceof Error ? err.message : 'Failed to load organization settings');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setOrgLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, [activeSection, isAuthenticated]);
+
+  const handleSaveOrganization = async () => {
+    setOrgSaving(true);
+    setOrgError('');
+    setOrgSaved(false);
+    try {
+      const res = await api.updateOrganizationSettings(orgSettings);
+      setOrgSettings(res.data);
+      setOrgSaved(true);
+      setTimeout(() => setOrgSaved(false), 2000);
+    } catch (err) {
+      setOrgError(err instanceof Error ? err.message : 'Failed to save organization settings');
+    } finally {
+      setOrgSaving(false);
+    }
+  };
 
   const handleSave = () => {
     setSaved(true);
@@ -232,19 +295,27 @@ export function SettingsPage() {
                   <CardDescription>Choose how and when you want to be notified</CardDescription>
                 </CardHeader>
                 <CardContent>
+                  {!isAuthenticated && (
+                    <p className="text-muted-foreground mb-4" style={{ fontSize: '13px' }}>
+                      Sign in to save your notification preferences.
+                    </p>
+                  )}
+                  {notifError && (
+                    <p className="text-destructive mb-4" style={{ fontSize: '13px' }}>{notifError}</p>
+                  )}
                   <div className="mb-4">
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Notifications</p>
-                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" checked={true} onChange={() => {}} />
-                    <ToggleSetting label="Approval Required" desc="When your approval is needed on a request" checked={true} onChange={() => {}} />
-                    <ToggleSetting label="Request Approved" desc="When your request gets approved" checked={true} onChange={() => {}} />
-                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" checked={true} onChange={() => {}} />
-                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" checked={false} onChange={() => {}} />
-                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" checked={true} onChange={() => {}} />
+                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" checked={notificationPrefs.emailSubmitted} onChange={(v) => void handleNotificationChange('emailSubmitted', v)} />
+                    <ToggleSetting label="Approval Required" desc="When your approval is needed on a request" checked={notificationPrefs.emailApproval} onChange={(v) => void handleNotificationChange('emailApproval', v)} />
+                    <ToggleSetting label="Request Approved" desc="When your request gets approved" checked={notificationPrefs.emailApproved} onChange={(v) => void handleNotificationChange('emailApproved', v)} />
+                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" checked={notificationPrefs.emailRejected} onChange={(v) => void handleNotificationChange('emailRejected', v)} />
+                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" checked={notificationPrefs.emailCompleted} onChange={(v) => void handleNotificationChange('emailCompleted', v)} />
+                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" checked={notificationPrefs.emailReminder} onChange={(v) => void handleNotificationChange('emailReminder', v)} />
                   </div>
                   <div>
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>In-App Notifications</p>
-                    <ToggleSetting label="Real-time Updates" desc="Instant notifications for all activity" checked={true} onChange={() => {}} />
-                    <ToggleSetting label="Daily Digest" desc="Daily summary email of pending items" checked={false} onChange={() => {}} />
+                    <ToggleSetting label="Real-time Updates" desc="Instant notifications for all activity" checked={notificationPrefs.inAppRealtime} onChange={(v) => void handleNotificationChange('inAppRealtime', v)} />
+                    <ToggleSetting label="Daily Digest" desc="Daily summary email of pending items" checked={notificationPrefs.emailDailyDigest} onChange={(v) => void handleNotificationChange('emailDailyDigest', v)} />
                   </div>
                 </CardContent>
               </Card>
@@ -488,21 +559,68 @@ export function SettingsPage() {
                   <CardDescription>Configure company-wide settings for the portal</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {[
-                    { label: 'Company Name', value: 'Acme Corporation Ltd.' },
-                    { label: 'Company Domain', value: 'acmecorp.com' },
-                    { label: 'Default SLA (hours)', value: '24' },
-                    { label: 'Admin Email', value: 'admin@acmecorp.com' },
-                  ].map(({ label, value }) => (
-                    <div key={label}>
-                      <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>{label.toUpperCase()}</label>
-                      <input defaultValue={value} className="w-full h-9 px-3 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30" style={{ fontSize: '13px' }} />
+                  {orgLoading ? (
+                    <div className="flex items-center justify-center py-10">
+                      <div className="size-8 rounded-full border-2 border-primary border-t-transparent animate-spin" />
                     </div>
-                  ))}
-                  <button className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-                    style={{ fontSize: '13px', fontWeight: 500 }}>
-                    Save Organization Settings
-                  </button>
+                  ) : (
+                    <>
+                      {[
+                        { key: 'companyName' as const, label: 'Company Name', type: 'text' },
+                        { key: 'companyDomain' as const, label: 'Company Domain', type: 'text' },
+                        { key: 'defaultSlaHours' as const, label: 'Default SLA (hours)', type: 'number' },
+                        { key: 'adminEmail' as const, label: 'Admin Email', type: 'email' },
+                      ].map(({ key, label, type }) => (
+                        <div key={key}>
+                          <label className="block mb-1.5 text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>
+                            {label.toUpperCase()}
+                          </label>
+                          <input
+                            type={type}
+                            value={orgSettings[key]}
+                            onChange={(e) => setOrgSettings((prev) => ({
+                              ...prev,
+                              [key]: type === 'number' ? Number(e.target.value) : e.target.value,
+                            }))}
+                            readOnly={!canEditOrganization}
+                            disabled={!canEditOrganization}
+                            min={type === 'number' ? 1 : undefined}
+                            max={type === 'number' ? 720 : undefined}
+                            className={cn(
+                              'w-full h-9 px-3 rounded-lg border border-border text-foreground outline-none transition-all',
+                              canEditOrganization
+                                ? 'bg-input-background focus:ring-2 focus:ring-primary/30'
+                                : 'bg-muted text-muted-foreground cursor-not-allowed',
+                            )}
+                            style={{ fontSize: '13px' }}
+                          />
+                        </div>
+                      ))}
+                      {orgError && (
+                        <p className="text-destructive" style={{ fontSize: '12px' }}>{orgError}</p>
+                      )}
+                      {!canEditOrganization && (
+                        <p className="text-muted-foreground" style={{ fontSize: '12px' }}>
+                          Only Super Admin or Admin can edit organization settings.
+                        </p>
+                      )}
+                      {canEditOrganization && (
+                        <button
+                          type="button"
+                          disabled={orgSaving}
+                          onClick={() => void handleSaveOrganization()}
+                          className={cn(
+                            'flex items-center gap-2 px-4 py-2 rounded-lg transition-opacity disabled:opacity-50',
+                            orgSaved ? 'bg-emerald-600 text-white' : 'bg-primary text-primary-foreground hover:opacity-90',
+                          )}
+                          style={{ fontSize: '13px', fontWeight: 500 }}
+                        >
+                          {orgSaved ? <Check className="size-4" /> : <Save className="size-4" />}
+                          {orgSaving ? 'Saving...' : orgSaved ? 'Saved!' : 'Save Organization Settings'}
+                        </button>
+                      )}
+                    </>
+                  )}
                 </CardContent>
               </Card>
             </motion.div>

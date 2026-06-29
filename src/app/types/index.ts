@@ -23,6 +23,13 @@ export type Page =
   | 'settings'
   | 'user-management';
 
+export interface OrganizationSettings {
+  companyName: string;
+  companyDomain: string;
+  defaultSlaHours: number;
+  adminEmail: string;
+}
+
 export interface Employee {
   id: string;
   name: string;
@@ -189,6 +196,7 @@ export interface Approver {
   initials: string;
   active?: boolean;
   preferences?: import('../utils/userPreferences').UserPreferences;
+  notificationPreferences?: import('../utils/notificationPreferences').NotificationPreferences;
 }
 
 export interface DashboardStats {

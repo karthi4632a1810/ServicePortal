@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { motion } from 'motion/react';
 import {
   Layers, Clock, CheckCircle, XCircle, Loader2,
-  User, Calendar, Play, Check, Search,
+  User, Calendar, Play, Check, Search, Building2,
 } from 'lucide-react';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
@@ -115,23 +115,51 @@ function KanbanColumn({ title, items, status, color, onStatusChange, updating }:
 }
 
 export function WorkQueuePage() {
-  const { refreshRequests } = useApp();
+  const { refreshRequests, currentUser } = useApp();
   const [items, setItems] = useState<QueueItem[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState<string | null>(null);
+  const [queueDepartments, setQueueDepartments] = useState<Array<{ code: string; name: string }>>([]);
+  const [selectedQueue, setSelectedQueue] = useState('IT');
+  const [employeeDeptFilter, setEmployeeDeptFilter] = useState('all');
+
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    let cancelled = false;
+    void api.getPortalDepartments()
+      .then((res) => {
+        if (cancelled) return;
+        const depts = res.data.map((d) => ({ code: d.code, name: d.name }));
+        setQueueDepartments(depts);
+        if (depts.length > 0) {
+          setSelectedQueue((current) => (depts.some((d) => d.code === current) ? current : depts[0].code));
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setQueueDepartments([{ code: 'IT', name: 'Information Technology' }]);
+      });
+    return () => { cancelled = true; };
+  }, [isSuperAdmin]);
+
+  useEffect(() => {
+    setEmployeeDeptFilter('all');
+  }, [selectedQueue]);
 
   const loadQueue = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await api.getDepartmentQueue('IT');
+      const deptCode = isSuperAdmin ? selectedQueue : 'IT';
+      const res = await api.getDepartmentQueue(deptCode);
       setItems(res.data as unknown as QueueItem[]);
     } catch {
       setItems([]);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [isSuperAdmin, selectedQueue]);
 
   useEffect(() => {
     void loadQueue();
@@ -173,28 +201,73 @@ export function WorkQueuePage() {
     }
   };
 
-  const filtered = items.filter(i =>
-    !search || i.title.toLowerCase().includes(search.toLowerCase()) || i.employee.toLowerCase().includes(search.toLowerCase())
-  );
+  const employeeDepartments = Array.from(
+    new Set(items.map((i) => i.department).filter(Boolean)),
+  ).sort();
+
+  const filtered = items.filter((i) => {
+    const q = search.toLowerCase();
+    const matchesSearch = !q
+      || i.title.toLowerCase().includes(q)
+      || i.employee.toLowerCase().includes(q)
+      || i.requestNumber.toLowerCase().includes(q);
+    const matchesDept = !isSuperAdmin || employeeDeptFilter === 'all' || i.department === employeeDeptFilter;
+    return matchesSearch && matchesDept;
+  });
 
   const byStatus = (status: QueueStatus) => filtered.filter(i => i.queueStatus === status);
 
   return (
     <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>Work Queue</h1>
-          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>Processing queue for approved forms</p>
+          <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
+            Processing queue for approved forms
+            {isSuperAdmin && queueDepartments.length > 0 && (
+              <> · {queueDepartments.find((d) => d.code === selectedQueue)?.name ?? selectedQueue}</>
+            )}
+          </p>
         </div>
-        <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Search queue..."
-            className="w-48 h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30"
-            style={{ fontSize: '13px' }}
-          />
+        <div className="flex items-center gap-2 flex-wrap">
+          {isSuperAdmin && (
+            <>
+              <div className="flex items-center gap-1.5">
+                <Building2 className="size-3.5 text-muted-foreground shrink-0" />
+                <select
+                  value={selectedQueue}
+                  onChange={(e) => setSelectedQueue(e.target.value)}
+                  className="h-9 px-3 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                  style={{ fontSize: '13px' }}
+                >
+                  {(queueDepartments.length > 0 ? queueDepartments : [{ code: 'IT', name: 'Information Technology' }]).map((dept) => (
+                    <option key={dept.code} value={dept.code}>{dept.name}</option>
+                  ))}
+                </select>
+              </div>
+              <select
+                value={employeeDeptFilter}
+                onChange={(e) => setEmployeeDeptFilter(e.target.value)}
+                className="h-9 px-3 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30"
+                style={{ fontSize: '13px' }}
+              >
+                <option value="all">All employee departments</option>
+                {employeeDepartments.map((dept) => (
+                  <option key={dept} value={dept}>{dept}</option>
+                ))}
+              </select>
+            </>
+          )}
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search queue..."
+              className="w-48 h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30"
+              style={{ fontSize: '13px' }}
+            />
+          </div>
         </div>
       </div>
 
