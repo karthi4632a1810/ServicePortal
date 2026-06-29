@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useLocation } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { ClipboardList, Key, LayoutDashboard, LogOut, Route } from 'lucide-react';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 import { useApp } from '../../context/AppContext';
-import { isFixedSuperAdmin } from '../../utils/roleAccess';
+import { getDefaultPage, isFixedSuperAdmin } from '../../utils/roleAccess';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
 import { UserAvatar } from '../ui/user-avatar';
 import { cn } from '../ui/utils';
@@ -19,10 +19,19 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
     currentUser,
     logout,
     changePassword,
+    navigate: setAdminPage,
   } = useApp();
   const [changePasswordOpen, setChangePasswordOpen] = useState(false);
   const location = useLocation();
+  const routerNavigate = useNavigate();
   const onTrackPage = location.pathname.startsWith('/track');
+
+  const goToAdminHome = () => {
+    if (currentUser) {
+      setAdminPage(getDefaultPage(currentUser.role));
+    }
+    routerNavigate('/admin');
+  };
 
   return (
     <div className="min-h-screen w-full bg-background flex flex-col overflow-x-hidden">
@@ -58,20 +67,27 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               <span className="hidden sm:inline">Track</span>
             </Link>
 
-            {isEmployeeSession && currentUser && (
+            {isAuthenticated && currentUser && (
               <>
-                <UserAvatar
-                  name={currentUser.name}
-                  initials={currentUser.initials}
-                  employeeId={currentUser.employeeId}
-                  avatar={currentUser.avatar}
-                  className="size-8 shrink-0"
-                />
-                <span className="hidden md:inline text-muted-foreground truncate max-w-[140px]" style={{ fontSize: '12px' }}>
-                  {currentUser.name}
-                  {currentUser.employeeId ? ` (${currentUser.employeeId})` : ''}
-                </span>
-                {!isFixedSuperAdmin(currentUser) && (
+                <button
+                  type="button"
+                  onClick={goToAdminHome}
+                  className="flex items-center gap-2 min-w-0 rounded-lg hover:bg-muted px-1.5 py-1 transition-colors shrink"
+                  title="Open dashboard"
+                >
+                  <UserAvatar
+                    name={currentUser.name}
+                    initials={currentUser.initials}
+                    employeeId={currentUser.employeeId}
+                    avatar={currentUser.avatar}
+                    className="size-8 shrink-0"
+                  />
+                  <span className="hidden md:inline text-muted-foreground truncate max-w-[140px]" style={{ fontSize: '12px' }}>
+                    {currentUser.name}
+                    {currentUser.employeeId ? ` (${currentUser.employeeId})` : ''}
+                  </span>
+                </button>
+                {isEmployeeSession && !isFixedSuperAdmin(currentUser) && (
                   <button
                     type="button"
                     onClick={() => setChangePasswordOpen(true)}
@@ -96,7 +112,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
               </>
             )}
 
-            {hasAdminAccess && (
+            {hasAdminAccess && !isEmployeeSession && (
               <Link
                 to="/admin"
                 className="inline-flex items-center justify-center gap-2 h-9 min-w-9 px-2.5 sm:px-4 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity shrink-0"
