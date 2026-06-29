@@ -1,1 +1,14 @@
 node_modules/
+dist/
+.env
+backend/.env
+!.env.production.example
+!.env.docker.example
+uploads/*
+!uploads/.gitkeep
+debug-*.log
+*.log
+.DS_Store
+.idea/
+.vscode/
+.cursor/

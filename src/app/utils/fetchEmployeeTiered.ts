@@ -2,6 +2,19 @@ import { api } from '../services/api';
 import type { Employee } from '../types';
 import { getCachedEmployee, setCachedEmployee } from './employeeCacheDb';
 
+/** Live HRMS lookup for staff login / ID verification (skips portal-only fast cache). */
+export async function verifyStaffInHrms(staffId: string): Promise<Employee | null> {
+  const id = staffId.trim();
+  if (!id) return null;
+  try {
+    const res = await api.getEmployeeLive(id);
+    void setCachedEmployee(res.data);
+    return res.data;
+  } catch {
+    return null;
+  }
+}
+
 /** IndexedDB → Mongo fast API → HRMS live (background refresh). */
 export async function fetchEmployeeTiered(
   employeeId: string,

@@ -17,7 +17,8 @@
     "seed:users": "pnpm --filter service-portal-backend seed:users",
     "seed:superadmin": "pnpm --filter service-portal-backend seed:superadmin",
     "clear:requests": "pnpm --filter service-portal-backend clear:requests",
-    "sync:forms": "pnpm --filter service-portal-backend sync:forms"
+    "sync:forms": "pnpm --filter service-portal-backend sync:forms",
+    "seed:mongo": "pnpm --filter service-portal-backend seed:mongo"
   },
   "dependencies": {
     "@emotion/react": "11.14.0",

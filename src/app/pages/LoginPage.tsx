@@ -6,7 +6,7 @@ import { useApp } from '../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../utils/branding';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
-import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
+import { verifyStaffInHrms } from '../utils/fetchEmployeeTiered';
 import type { Employee } from '../types';
 
 function staffInitials(name: string) {
@@ -56,14 +56,13 @@ export function LoginPage() {
     const timer = window.setTimeout(() => {
       setVerifying(true);
       setProfileError('');
-      void fetchEmployeeTiered(id, undefined, (emp) => {
+      void verifyStaffInHrms(id).then((emp) => {
         if (identifier.trim() !== id) return;
-        setEmployee(emp);
-        lastVerifiedId.current = id;
-        setProfileError('');
-      }).then((emp) => {
-        if (identifier.trim() !== id) return;
-        if (!emp) {
+        if (emp) {
+          setEmployee(emp);
+          lastVerifiedId.current = id;
+          setProfileError('');
+        } else {
           setEmployee(null);
           lastVerifiedId.current = '';
           setProfileError('Staff ID not found in HRMS — you can still try signing in');

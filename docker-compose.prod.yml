@@ -1,0 +1,41 @@
+# Production overrides for Hostinger VPS (use with docker-compose.yml)
+# Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+
+services:
+  mongo:
+    ports: []   # MongoDB not exposed to the internet
+
+  backend:
+    ports: []   # API only via frontend/Caddy proxy
+
+  frontend:
+    ports: []   # App only via Caddy on 80/443
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: paperzero-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:?Set DOMAIN in .env e.g. portal.yourhospital.com}
+      ACME_EMAIL: ${ACME_EMAIL:-admin@example.com}
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      frontend:
+        condition: service_started
+
+  seed:
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+
+volumes:
+  caddy_data:
+  caddy_config:

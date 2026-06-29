@@ -9,7 +9,7 @@ import {
 import { RippleButton } from '../animations/RippleButton';
 import { PasswordInput } from '../ui/password-input';
 import { UserAvatar } from '../ui/user-avatar';
-import { fetchEmployeeTiered } from '../../utils/fetchEmployeeTiered';
+import { verifyStaffInHrms } from '../../utils/fetchEmployeeTiered';
 import type { Employee } from '../../types';
 
 function staffInitials(name: string) {
@@ -75,10 +75,12 @@ export function StaffLoginModal({ open, onOpenChange, onSubmit, formTitle }: Sta
       setVerifying(true);
       setVerifyError('');
       setLoginError('');
-      void fetchEmployeeTiered(id, undefined, setEmployee).then((emp) => {
+      void verifyStaffInHrms(id).then((emp) => {
         if (staffId.trim() !== id) return;
         if (emp) {
+          setEmployee(emp);
           lastVerifiedId.current = id;
+          setVerifyError('');
         } else {
           setEmployee(null);
           lastVerifiedId.current = '';

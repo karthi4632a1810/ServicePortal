@@ -1,12 +1,82 @@
 services:
-  mongodb:
-    image: mongo:latest
-    container_name: mongodb
+  mongo:
+    image: mongo:7
+    container_name: paperzero-mongo
     restart: unless-stopped
     ports:
       - "27017:27017"
     volumes:
-      - mongodb_data:/data/db
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    container_name: paperzero-backend
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    env_file:
+      - path: .env
+        required: false
+      - path: backend/.env
+        required: false
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGODB_URI: mongodb://mongo:27017/service_portal
+      JWT_SECRET: ${JWT_SECRET:-service-portal-docker-secret-change-me}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:3000}
+      HRMS_DB_HOST: ${HRMS_DB_HOST:-}
+      HRMS_DB_PORT: ${HRMS_DB_PORT:-3306}
+      HRMS_DB_USER: ${HRMS_DB_USER:-}
+      HRMS_DB_PASSWORD: ${HRMS_DB_PASSWORD:-}
+      HRMS_DB_NAME: ${HRMS_DB_NAME:-}
+      HRMS_DB_TABLE: ${HRMS_DB_TABLE:-staff_profile_tb}
+      DEFAULT_EMPLOYEE_PASSWORD: ${DEFAULT_EMPLOYEE_PASSWORD:-mapims}
+    volumes:
+      - uploads_data:/app/uploads
+    depends_on:
+      mongo:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_URL: /api
+    container_name: paperzero-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  # One-time seed (run: docker compose --profile seed run --rm seed)
+  seed:
+    profiles: [seed]
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      NODE_ENV: development
+      MONGODB_URI: mongodb://mongo:27017/service_portal
+      JWT_SECRET: ${JWT_SECRET:-service-portal-docker-secret-change-me}
+      DEFAULT_EMPLOYEE_PASSWORD: ${DEFAULT_EMPLOYEE_PASSWORD:-mapims}
+    command: ["node", "backend/scripts/seedMongoDb.js"]
+    depends_on:
+      mongo:
+        condition: service_healthy
 
 volumes:
-  mongodb_data:
+  mongo_data:
+  uploads_data:

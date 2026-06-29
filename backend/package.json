@@ -14,6 +14,7 @@
     "seed:superadmin": "node src/seeds/superadmin.js",
     "clear:requests": "node src/seeds/clearRequests.js",
     "sync:forms": "node src/seeds/syncForms.js",
+    "seed:mongo": "node scripts/seedMongoDb.js",
     "test:hrms": "node scripts/test-hrms-db.mjs"
   },
   "dependencies": {

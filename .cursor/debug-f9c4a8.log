@@ -353,3 +353,4 @@
 {"sessionId":"f9c4a8","hypothesisId":"H2","location":"AppContext.tsx:refreshRequests","message":"refreshRequests done","data":{"role":"employee","count":1,"durationMs":205,"source":"employee"},"timestamp":1782471363665}
 {"sessionId":"f9c4a8","hypothesisId":"H1","location":"AppContext.tsx:bootstrap","message":"bootstrap complete","data":{"durationMs":58,"hasToken":true,"errorCount":0},"timestamp":1782471366162}
 {"sessionId":"f9c4a8","hypothesisId":"H1","location":"AppContext.tsx:bootstrap","message":"bootstrap complete","data":{"durationMs":61,"hasToken":true,"errorCount":0},"timestamp":1782471366165}
+{"sessionId":"f9c4a8","hypothesisId":"H1","location":"AppContext.tsx:bootstrap","message":"bootstrap complete","data":{"durationMs":1619,"hasToken":false,"errorCount":1},"timestamp":1782558022595}
