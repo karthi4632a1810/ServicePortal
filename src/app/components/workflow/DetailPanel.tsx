@@ -541,13 +541,13 @@ export function DetailPanel({
               <div className="flex items-center gap-2 px-4 py-2.5">
                 <div className="flex-1 min-w-0 flex items-center gap-2">
                   <span className="text-foreground truncate" style={{ fontSize: '12px', fontWeight: 700, fontFamily: 'monospace' }}>
-                    {request.requestNumber}
-                  </span>
-                  {priorityCfg && (
-                    <span className={cn('px-1.5 py-0.5 rounded shrink-0', priorityCfg.bg, priorityCfg.text)}
-                      style={{ fontSize: '9px', fontWeight: 700 }}>
-                      {request.priority.toUpperCase()}
+                      {request.requestNumber}
                     </span>
+                    {priorityCfg && (
+                    <span className={cn('px-1.5 py-0.5 rounded shrink-0', priorityCfg.bg, priorityCfg.text)}
+                        style={{ fontSize: '9px', fontWeight: 700 }}>
+                        {request.priority.toUpperCase()}
+                      </span>
                   )}
                 </div>
                 <div className="flex items-center gap-1 shrink-0">
@@ -601,32 +601,32 @@ export function DetailPanel({
               {/* Request header — scrolls with content */}
               <div className="px-5 pt-4 pb-3 border-b border-border/50 bg-muted/10">
                 <div className="flex items-start gap-2 flex-wrap">
-                  {request.isOverdue && (
-                    <motion.span
-                      animate={{ opacity: [1, 0.5, 1] }}
-                      transition={{ duration: 1.5, repeat: Infinity }}
-                      className="flex items-center gap-0.5 text-red-600"
-                      style={{ fontSize: '9px', fontWeight: 700 }}
-                    >
-                      <AlertTriangle className="size-2.5" /> SLA BREACHED
-                    </motion.span>
-                  )}
-                </div>
-                <p className="text-foreground mt-0.5" style={{ fontSize: '15px', fontWeight: 600 }}>{request.formTitle}</p>
-                <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{request.category}</p>
-                <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-                  <SLABadge dueAt={request.dueAt} isOverdue={request.isOverdue} />
-                  <span className="text-muted-foreground flex items-center gap-1" style={{ fontSize: '11px' }}>
-                    <Calendar className="size-3" />
-                    {new Date(request.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                    {request.isOverdue && (
+                      <motion.span
+                        animate={{ opacity: [1, 0.5, 1] }}
+                        transition={{ duration: 1.5, repeat: Infinity }}
+                        className="flex items-center gap-0.5 text-red-600"
+                        style={{ fontSize: '9px', fontWeight: 700 }}
+                      >
+                        <AlertTriangle className="size-2.5" /> SLA BREACHED
+                      </motion.span>
+                    )}
+                  </div>
+                  <p className="text-foreground mt-0.5" style={{ fontSize: '15px', fontWeight: 600 }}>{request.formTitle}</p>
+                  <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{request.category}</p>
+              <div className="flex items-center gap-3 mt-2.5 flex-wrap">
+                <SLABadge dueAt={request.dueAt} isOverdue={request.isOverdue} />
+                <span className="text-muted-foreground flex items-center gap-1" style={{ fontSize: '11px' }}>
+                  <Calendar className="size-3" />
+                  {new Date(request.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}
+                </span>
+                {request.watchers.length > 0 && (
+                  <span className="text-muted-foreground" style={{ fontSize: '11px' }}>
+                    {request.watchers.length} watcher{request.watchers.length > 1 ? 's' : ''}
                   </span>
-                  {request.watchers.length > 0 && (
-                    <span className="text-muted-foreground" style={{ fontSize: '11px' }}>
-                      {request.watchers.length} watcher{request.watchers.length > 1 ? 's' : ''}
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
+            </div>
 
               <AnimatePresence mode="wait">
                 {activeTab === 'overview' && (
@@ -639,12 +639,12 @@ export function DetailPanel({
                     className="p-5 space-y-4"
                   >
                     {/* Compact employee */}
-                    <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
+                      <div className="flex items-center gap-3 p-3 rounded-xl border border-border bg-muted/20">
                       <div className="size-9 rounded-lg flex items-center justify-center shrink-0"
-                        style={{ background: request.employeeColor + '22', border: `1.5px solid ${request.employeeColor}44` }}>
+                          style={{ background: request.employeeColor + '22', border: `1.5px solid ${request.employeeColor}44` }}>
                         <span style={{ fontSize: '11px', fontWeight: 700, color: request.employeeColor }}>{request.employeeInitials}</span>
-                      </div>
-                      <div className="flex-1 min-w-0">
+                        </div>
+                        <div className="flex-1 min-w-0">
                         <p className="text-foreground truncate" style={{ fontSize: '13px', fontWeight: 600 }}>{request.employeeName}</p>
                         <p className="text-muted-foreground truncate" style={{ fontSize: '11px' }}>
                           Staff ID {request.employeeId} · {request.employeeDept}
@@ -660,7 +660,7 @@ export function DetailPanel({
                       </div>
 
                       {(request.assignees?.length || request.assignedTo) ? (
-                        <div className="space-y-2">
+                      <div className="space-y-2">
                           {(request.assignees?.length ? request.assignees : [{ employeeId: request.assignedToEmployeeId || '', name: request.assignedTo || '' }]).map((a) => (
                             <div key={a.employeeId || a.name} className="flex items-center gap-2.5 p-2.5 rounded-lg bg-card border border-border/60">
                               <UserAvatar
@@ -675,9 +675,9 @@ export function DetailPanel({
                                   <span className="text-muted-foreground" style={{ fontSize: '10px' }}>Staff ID: {a.employeeId}</span>
                                 )}
                               </div>
-                            </div>
-                          ))}
-                        </div>
+                          </div>
+                        ))}
+                      </div>
                       ) : (
                         <div className="flex items-center gap-2 text-muted-foreground py-1">
                           <User className="size-4 shrink-0" />
@@ -867,7 +867,7 @@ export function DetailPanel({
                       className="w-full px-3 py-2 rounded-lg border border-border bg-input-background text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 resize-none"
                       style={{ fontSize: '12px' }}
                     />
-                    <div className="flex gap-2">
+                <div className="flex gap-2">
                       <RippleButton
                         variant="success"
                         className="flex-1 justify-center"
@@ -876,7 +876,7 @@ export function DetailPanel({
                         onClick={() => void handleApprove('approve')}
                       >
                         {submitting ? 'Saving...' : 'Approve'}
-                      </RippleButton>
+                  </RippleButton>
                       <RippleButton
                         variant="destructive"
                         className="flex-1 justify-center"
@@ -884,8 +884,8 @@ export function DetailPanel({
                         disabled={submitting}
                         onClick={() => void handleApprove('reject')}
                       >
-                        Reject
-                      </RippleButton>
+                    Reject
+                  </RippleButton>
                     </div>
                   </div>
                 )}

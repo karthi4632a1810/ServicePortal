@@ -86,13 +86,32 @@ Shared Hostinger Docker (ports 27017/5000/3000 already used by other apps):
 bash deploy/deploy.sh --hostinger --seed
 ```
 
-Traefik routes `https://paper.mapims.edu.in` automatically (labels in `docker-compose.hostinger.yml`). Port **8093** remains for direct/local testing.
+Traefik is **not** used on this shared VPS. Other apps (tms, pg, feedback) use **host nginx** (`nginx/1.24.0 Ubuntu`) with per-subdomain configs.
 
-**Requires:** Traefik project in Docker Manager (`docker network ls | grep traefik`).
-
-In **Hostinger Docker Manager** → paste **`docker-compose.yml`** + **`docker-compose.hostinger.yml`** in the **.yaml editor**, or deploy via terminal:
+**Step 5b — Register domain with host nginx** (one-time):
 
 ```bash
+cd /docker/ServicePortal
+git pull
+
+# See how another app is wired (example: tms)
+ls -la /etc/nginx/sites-enabled/
+cat /docker/tms/nginx/tms.conf
+
+# Install PaperZero config
+sudo cp deploy/nginx/paper.mapims.edu.in.conf /etc/nginx/sites-available/
+sudo ln -sf /etc/nginx/sites-available/paper.mapims.edu.in.conf /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+# Optional HTTPS
+sudo certbot --nginx -d paper.mapims.edu.in
+```
+
+Deploy containers:
+
+```bash
+bash deploy/deploy.sh --hostinger --seed
+# or
 docker compose -f docker-compose.yml -f docker-compose.hostinger.yml up -d --build
 ```
 
