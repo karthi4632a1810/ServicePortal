@@ -1,0 +1,15 @@
+# Local development — expose ports on localhost
+# Usage: docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
+
+services:
+  mongo:
+    ports:
+      - "27017:27017"
+
+  backend:
+    ports:
+      - "5000:5000"
+
+  frontend:
+    ports:
+      - "3000:80"

@@ -47,13 +47,13 @@ bash deploy/install-vps.sh
 
 **Step 2 — Point domain DNS**
 
-In Hostinger DNS for your domain:
+In Hostinger DNS for `mapims.edu.in`:
 
-- Type: `A`
-- Name: `portal` (or `@`)
-- Value: your VPS IP
+| Type | Name | Value |
+|------|------|-------|
+| A | `paper` | Your VPS public IP |
 
-Wait 5–30 minutes for DNS.
+This creates **https://paper.mapims.edu.in**. Wait 5–30 minutes for DNS.
 
 **Step 3 — Create production `.env`**
 
@@ -65,9 +65,9 @@ nano .env
 
 Set at minimum:
 
-- `DOMAIN=portal.yourhospital.com`
-- `ACME_EMAIL=your@email.com`
-- `CORS_ORIGIN=https://portal.yourhospital.com`
+- `DOMAIN=paper.mapims.edu.in`
+- `ACME_EMAIL=it@mapims.edu.in` (or your IT email — used for SSL)
+- `CORS_ORIGIN=https://paper.mapims.edu.in`
 - `JWT_SECRET=` (long random string)
 - `HRMS_DB_*` (MySQL credentials)
 
@@ -84,8 +84,8 @@ bash deploy/deploy.sh --seed
 **Step 6 — Verify**
 
 ```bash
-curl -s https://portal.yourhospital.com/api/health
-curl -s https://portal.yourhospital.com/api/forms | head
+curl -s https://paper.mapims.edu.in/api/health
+curl -s https://paper.mapims.edu.in/api/forms | head
 ```
 
 Open the site in a browser. Login: Staff ID `12345` / `superadmin` (or your HRMS staff + `mapims`).
@@ -129,7 +129,7 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile seed r
 ## Local dev (unchanged)
 
 ```bash
-docker compose up -d --build
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d --build
 docker compose exec backend node backend/scripts/seedMongoDb.js
 ```
 

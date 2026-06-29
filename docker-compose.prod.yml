@@ -2,14 +2,11 @@
 # Usage: docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
 
 services:
-  mongo:
-    ports: []   # MongoDB not exposed to the internet
-
   backend:
-    ports: []   # API only via frontend/Caddy proxy
+    ports: !reset []
 
   frontend:
-    ports: []   # App only via Caddy on 80/443
+    ports: !reset []
 
   caddy:
     image: caddy:2-alpine

@@ -3,8 +3,8 @@ services:
     image: mongo:7
     container_name: paperzero-mongo
     restart: unless-stopped
-    ports:
-      - "27017:27017"
+    # No host port — backend uses mongodb://mongo:27017 on Docker network
+    # Local dev: use docker-compose.dev.yml to expose 27017
     volumes:
       - mongo_data:/data/db
     healthcheck:
@@ -20,8 +20,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: paperzero-backend
     restart: unless-stopped
-    ports:
-      - "5000:5000"
+    # No host port in production — API via frontend/Caddy. Dev: docker-compose.dev.yml
     env_file:
       - path: .env
         required: false
@@ -55,8 +54,7 @@ services:
         VITE_API_URL: /api
     container_name: paperzero-frontend
     restart: unless-stopped
-    ports:
-      - "3000:80"
+    # No host port in production — Caddy on 80/443. Dev: docker-compose.dev.yml
     depends_on:
       backend:
         condition: service_healthy
