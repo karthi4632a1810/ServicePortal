@@ -20,7 +20,7 @@ services:
       dockerfile: backend/Dockerfile
     container_name: paperzero-backend
     restart: unless-stopped
-    # No host port in production — API via frontend/Caddy. Dev: docker-compose.dev.yml
+    # No host port in production — API via frontend/nginx proxy. Dev: docker-compose.dev.yml
     env_file:
       - path: .env
         required: false
@@ -54,7 +54,7 @@ services:
         VITE_API_URL: /api
     container_name: paperzero-frontend
     restart: unless-stopped
-    # No host port in production — Caddy on 80/443. Dev: docker-compose.dev.yml
+    # No host port in production — nginx/Caddy on 80/443 or APP_PORT. Dev: docker-compose.dev.yml
     depends_on:
       backend:
         condition: service_healthy

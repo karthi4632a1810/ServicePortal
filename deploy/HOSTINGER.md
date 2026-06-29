@@ -4,8 +4,8 @@
 
 | Service | Role |
 |---------|------|
-| **caddy** | HTTPS (Let's Encrypt) on ports 80/443 |
-| **frontend** | React app + nginx proxy to API |
+| **nginx** | Reverse proxy on `APP_PORT` (default 8093) → frontend |
+| **frontend** | React app + internal nginx (proxies `/api` to backend) |
 | **backend** | Node API |
 | **mongo** | Database (not exposed publicly) |
 
@@ -86,9 +86,9 @@ Shared Hostinger Docker (ports 27017/5000/3000 already used by other apps):
 bash deploy/deploy.sh --hostinger --seed
 ```
 
-In **Hostinger Docker Manager** → **ServicePortal** → map **paper.mapims.edu.in** to port **8093**.
+In **Hostinger Docker Manager** → **ServicePortal** → map **paper.mapims.edu.in** to port **8093** (nginx container).
 
-Dedicated VPS (empty server, Caddy SSL):
+Dedicated VPS (nginx on 80/443; optional Caddy: `--profile caddy`):
 
 ```bash
 bash deploy/deploy.sh --seed

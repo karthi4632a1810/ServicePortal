@@ -1,16 +1,27 @@
 # Hostinger Docker Manager — shared VPS (many projects on same server)
-# Avoids ports used by other apps: 27017, 5000, 3000, 8085-8092, 5010-5015
-#
-# Usage:
-#   docker compose -f docker-compose.yml -f docker-compose.hostinger.yml up -d --build
-#   bash deploy/deploy.sh --hostinger --seed
-#
-# In Hostinger Docker Manager: map paper.mapims.edu.in → frontend port APP_PORT (default 8093)
+# Nginx on APP_PORT (default 8093) → frontend (internal) → backend (internal)
 
 services:
   frontend:
+    expose:
+      - "80"
+
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: paperzero-nginx
+    restart: unless-stopped
     ports:
       - "${APP_PORT:-8093}:80"
+    volumes:
+      - ./deploy/nginx.hostinger.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      frontend:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "nginx", "-t"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   seed:
     env_file:

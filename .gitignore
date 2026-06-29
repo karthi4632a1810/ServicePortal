@@ -12,3 +12,4 @@ debug-*.log
 .idea/
 .vscode/
 .cursor/
+deploy/ssl/*.pem

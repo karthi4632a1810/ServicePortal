@@ -2,7 +2,7 @@
 # Build and start PaperZero (production)
 # Usage:
 #   bash deploy/deploy.sh --hostinger --seed   # Hostinger shared VPS (port 8093)
-#   bash deploy/deploy.sh --seed               # Dedicated VPS with Caddy SSL
+#   bash deploy/deploy.sh --seed               # Dedicated VPS with nginx (ports 80/443)
 
 set -euo pipefail
 

@@ -1,0 +1,7 @@
+# Optional SSL certificates for nginx (docker-compose.prod.yml)
+# Place fullchain.pem and privkey.pem here, then uncomment HTTPS block in deploy/nginx.prod.conf
+#
+# Generate with certbot on the VPS:
+#   certbot certonly --standalone -d paper.mapims.edu.in
+#   cp /etc/letsencrypt/live/paper.mapims.edu.in/fullchain.pem deploy/ssl/
+#   cp /etc/letsencrypt/live/paper.mapims.edu.in/privkey.pem deploy/ssl/
