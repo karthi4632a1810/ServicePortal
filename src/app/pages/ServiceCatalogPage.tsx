@@ -66,7 +66,7 @@ function FormCard({ form, onClick }: { form: FormSchema; onClick: () => void }) 
             <span>v{form.version}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1 text-primary opacity-0 group-hover:opacity-100 transition-opacity" style={{ fontSize: '12px', fontWeight: 500 }}>
+        <div className="flex items-center gap-1 text-primary sm:opacity-0 sm:group-hover:opacity-100 transition-opacity" style={{ fontSize: '12px', fontWeight: 500 }}>
           Apply <ChevronRight className="size-3.5" />
         </div>
       </div>
@@ -149,7 +149,7 @@ export function ServiceCatalogPage() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="p-6 space-y-6 w-full"
+      className="p-4 sm:p-6 space-y-5 sm:space-y-6 w-full"
     >
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
@@ -161,25 +161,25 @@ export function ServiceCatalogPage() {
 
       {/* Filters */}
       <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.05 }}
-        className="flex items-center gap-3 flex-wrap">
-        <div className="relative">
+        className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+        <div className="relative w-full sm:w-auto sm:flex-1 sm:max-w-xs">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search forms..."
-            className="w-64 h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            style={{ fontSize: '13px' }}
+            className="w-full h-10 sm:h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            style={{ fontSize: '16px' }}
           />
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 -mx-1 px-1 scrollbar-none flex-nowrap">
           {departments.map(dept => (
             <button
               key={dept}
               onClick={() => setActiveDepartment(dept === 'All' ? null : dept)}
               className={cn(
-                'px-3 py-1.5 rounded-lg border transition-colors',
+                'px-3 py-1.5 rounded-lg border transition-colors whitespace-nowrap shrink-0',
                 (dept === 'All' && !activeDepartment) || dept === activeDepartment
                   ? 'bg-primary text-primary-foreground border-primary'
                   : 'bg-card text-muted-foreground border-border hover:text-foreground hover:border-primary/40'
@@ -191,7 +191,7 @@ export function ServiceCatalogPage() {
           ))}
         </div>
 
-        <div className="ml-auto text-muted-foreground" style={{ fontSize: '12px' }}>
+        <div className="text-muted-foreground sm:ml-auto" style={{ fontSize: '12px' }}>
           {filtered.length} form{filtered.length !== 1 ? 's' : ''} available
         </div>
       </motion.div>
@@ -231,7 +231,7 @@ export function ServiceCatalogPage() {
                 variants={stagger}
                 initial="hidden"
                 animate="show"
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 sm:gap-4"
               >
                 {forms.map(form => (
                   <FormCard key={form.id} form={form} onClick={() => handleFormSelect(form)} />

@@ -16,6 +16,7 @@ import { ServiceCatalogPage } from './pages/ServiceCatalogPage';
 import { DynamicFormPage } from './pages/DynamicFormPage';
 import { MyRequestsPage } from './pages/MyRequestsPage';
 import { MyTasksPage } from './pages/MyTasksPage';
+import { TrackPage } from './pages/TrackPage';
 import { RequestDetailPage } from './pages/RequestDetailPage';
 import { ApprovalsPage } from './pages/ApprovalsPage';
 import { SettingsPage } from './pages/SettingsPage';
@@ -135,6 +136,14 @@ function AppRoutes() {
         element={
           <PublicLayout>
             <DynamicFormPage />
+          </PublicLayout>
+        }
+      />
+      <Route
+        path="/track"
+        element={
+          <PublicLayout>
+            <TrackPage />
           </PublicLayout>
         }
       />

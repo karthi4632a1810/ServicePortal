@@ -36,7 +36,17 @@ class ApiClient {
     if (token) headers.Authorization = `Bearer ${token}`;
 
     const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
-    const json = await res.json();
+    const text = await res.text();
+
+    let json: ApiResponse<T> & { message?: string; success?: boolean };
+    try {
+      json = text ? JSON.parse(text) : { success: false, message: 'Empty response', data: null as T };
+    } catch {
+      const fallback = res.status === 429
+        ? 'Too many requests. Please wait a moment and try again.'
+        : text?.slice(0, 200) || `Request failed (${res.status})`;
+      throw new Error(fallback);
+    }
 
     if (!res.ok || !json.success) {
       throw new Error(json.message || 'Request failed');

@@ -32,9 +32,16 @@ app.use(express.urlencoded({ extended: true }));
 
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: config.nodeEnv === 'production' ? 200 : 1000,
+  max: config.nodeEnv === 'production' ? 800 : 2000,
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => req.path === '/health' || req.originalUrl.startsWith('/api/health'),
+  handler: (_req, res) => {
+    res.status(429).json({
+      success: false,
+      message: 'Too many requests. Please wait a moment and try again.',
+    });
+  },
 });
 app.use('/api/', limiter);
 

@@ -48,7 +48,13 @@ function TimelineEvent({ by, role, text, timestamp, type, isLast }: {
   );
 }
 
-export function RequestDetailPage() {
+export function RequestDetailPage({
+  publicMode = false,
+  onBack,
+}: {
+  publicMode?: boolean;
+  onBack?: () => void;
+} = {}) {
   const { selectedRequest, navigate, performApprovalAction, currentUser, updateRequest } = useApp();
   const [comment, setComment] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
@@ -69,11 +75,11 @@ export function RequestDetailPage() {
       <div className="p-6 text-center">
         <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No request selected</p>
         <button
-          onClick={() => navigate('approvals')}
+          onClick={() => (publicMode ? onBack?.() : navigate('approvals'))}
           className="mt-4 text-primary hover:underline"
           style={{ fontSize: '13px' }}
         >
-          Back to Approvals
+          {publicMode ? 'Back to Track' : 'Back to Approvals'}
         </button>
       </div>
     );
@@ -113,28 +119,28 @@ export function RequestDetailPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-6 w-full space-y-5">
+    <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="p-4 sm:p-6 w-full space-y-4 sm:space-y-5">
       {/* Back + Title */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3 min-w-0">
           <button
-            onClick={() => navigate('my-requests')}
-            className="size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+            onClick={() => (publicMode ? onBack?.() : navigate('my-requests'))}
+            className="size-9 sm:size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
           >
             <ChevronLeft className="size-4" />
           </button>
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-foreground" style={{ fontSize: '17px', fontWeight: 600 }}>{req.requestNumber}</h1>
-              <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold', statusCfg.bg, statusCfg.color, statusCfg.border)}>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <h1 className="text-foreground break-all" style={{ fontSize: '17px', fontWeight: 600 }}>{req.requestNumber}</h1>
+              <span className={cn('flex items-center gap-1.5 px-2.5 py-1 rounded-md border text-xs font-semibold shrink-0', statusCfg.bg, statusCfg.color, statusCfg.border)}>
                 <StatusIcon className="size-3" />
                 {statusCfg.label}
               </span>
             </div>
-            <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{req.formTitle}</p>
+            <p className="text-muted-foreground truncate" style={{ fontSize: '12px' }}>{req.formTitle}</p>
           </div>
         </div>
-        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+        <button className="flex items-center justify-center gap-2 w-full sm:w-auto px-3 py-2 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
           style={{ fontSize: '12px' }}>
           <Download className="size-3.5" />
           Download PDF
@@ -150,11 +156,11 @@ export function RequestDetailPage() {
               <CardTitle>Employee Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="flex items-start gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-start gap-4">
                 <div className="size-12 rounded-xl bg-primary flex items-center justify-center shrink-0">
                   <span className="text-primary-foreground font-bold" style={{ fontSize: '16px' }}>{req.employee.avatar ?? req.employee.name.substring(0, 2)}</span>
                 </div>
-                <div className="flex-1 grid grid-cols-2 gap-3">
+                <div className="flex-1 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {[
                     { label: 'Name', value: req.employee.name },
                     { label: 'Employee ID', value: req.employee.id },
@@ -181,7 +187,7 @@ export function RequestDetailPage() {
               <CardTitle>Request Details</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {Object.entries(req.answers).map(([key, value]) => (
                   <div key={key}>
                     <p className="text-muted-foreground" style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>

@@ -57,7 +57,7 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
     return <div className="col-span-full border-t border-border" />;
   }
 
-  const widthClass = field.width === 'full' || !field.width ? 'col-span-full' : '';
+  const widthClass = field.width === 'full' || !field.width ? 'col-span-full' : 'col-span-full sm:col-span-1';
   const dropdownOptions = getEffectiveHrmsSource(field) === 'department'
     ? hrmsDepartments
     : getEffectiveHrmsSource(field) === 'designation'
@@ -499,7 +499,7 @@ export function DynamicFormPage() {
             className="flex gap-3 justify-center"
           >
             <RippleButton variant="primary" onClick={() => {
-              if (isPublicForm) routerNavigate('/login');
+              if (isPublicForm) routerNavigate('/track');
               else navigate('my-requests');
             }}>
               {isPublicForm ? 'Sign In to Track' : 'Track Request'}
@@ -520,7 +520,7 @@ export function DynamicFormPage() {
     <motion.div
       initial={{ opacity: 0, y: 12 }}
       animate={{ opacity: 1, y: 0 }}
-      className="p-6 w-full space-y-5"
+      className="p-4 sm:p-6 w-full space-y-4 sm:space-y-5"
     >
       {/* Back */}
       <button
@@ -542,7 +542,7 @@ export function DynamicFormPage() {
             <div>
               <h1 className="text-foreground" style={{ fontSize: '18px', fontWeight: 600 }}>{form.title}</h1>
               <p className="text-muted-foreground" style={{ fontSize: '13px' }}>{form.description}</p>
-              <div className="flex items-center gap-4 mt-2">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-2">
                 <span className="text-muted-foreground flex items-center gap-1" style={{ fontSize: '11px' }}>
                   <Clock className="size-3" /> {form.estimatedTime}
                 </span>
@@ -588,7 +588,7 @@ export function DynamicFormPage() {
               </p>
             </div>
           )}
-          <div className="grid grid-cols-2 gap-x-4 gap-y-5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-5">
             {normalizedFields.map((field) => (
               <FormFieldRenderer
                 key={field.id}
@@ -607,13 +607,13 @@ export function DynamicFormPage() {
       </Card>
 
       {/* Submit */}
-      <div className="flex items-center justify-between">
-        <p className="text-muted-foreground flex items-center gap-1" style={{ fontSize: '11px' }}>
-          <Info className="size-3" />
+      <div className="flex flex-col-reverse sm:flex-row sm:items-center sm:justify-between gap-4">
+        <p className="text-muted-foreground flex items-center gap-1 text-center sm:text-left" style={{ fontSize: '11px' }}>
+          <Info className="size-3 shrink-0" />
           By submitting, you confirm the above information is accurate.
         </p>
-        <div className="flex gap-3">
-          <RippleButton variant="ghost" onClick={goBack}>
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 w-full sm:w-auto">
+          <RippleButton variant="ghost" onClick={goBack} className="w-full sm:w-auto">
             Cancel
           </RippleButton>
           <RippleButton
@@ -621,6 +621,7 @@ export function DynamicFormPage() {
             loading={submitting}
             onClick={handleSubmit}
             icon={<Send className="size-4" />}
+            className="w-full sm:w-auto"
           >
             Submit Request
           </RippleButton>

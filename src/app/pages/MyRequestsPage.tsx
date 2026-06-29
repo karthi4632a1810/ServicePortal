@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { motion } from 'motion/react';
+import { useNavigate } from 'react-router';
 import {
   Search, Filter, FileText, Clock, CheckCircle, XCircle,
   Loader2, ChevronDown, Eye, Download, MoreHorizontal,
@@ -27,6 +28,52 @@ const PRIORITY_CONFIG = {
   medium: { label: 'Med', color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-950' },
   low: { label: 'Low', color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-100 dark:bg-gray-800' },
 };
+
+function RequestMobileCard({ req, onClick }: { req: Request; onClick: () => void }) {
+  const statusCfg = STATUS_CONFIG[req.status];
+  const priorityCfg = PRIORITY_CONFIG[req.priority];
+  const StatusIcon = statusCfg.icon;
+  const progress = (req.currentStep / Math.max(req.workflow.length, 1)) * 100;
+
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.99 }}
+      onClick={onClick}
+      className="w-full text-left p-4 rounded-xl border border-border/60 bg-card hover:border-primary/30 transition-colors"
+    >
+      <div className="flex items-start justify-between gap-2 mb-2">
+        <div className="min-w-0">
+          <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>{req.formTitle}</p>
+          <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{req.requestNumber}</p>
+        </div>
+        <span className={cn('inline-flex items-center gap-1 px-2 py-1 rounded-md shrink-0', statusCfg.bg, statusCfg.color)}
+          style={{ fontSize: '10px', fontWeight: 600 }}>
+          <StatusIcon className="size-3" />
+          {statusCfg.label}
+        </span>
+      </div>
+      <div className="flex items-center justify-between gap-2 mb-2">
+        <span className={cn('px-2 py-0.5 rounded', priorityCfg.bg, priorityCfg.color)}
+          style={{ fontSize: '10px', fontWeight: 700 }}>
+          {priorityCfg.label}
+        </span>
+        <span className="text-muted-foreground" style={{ fontSize: '11px' }}>
+          {new Date(req.submittedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: '2-digit' })}
+        </span>
+      </div>
+      <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+        <div
+          className={cn('h-full rounded-full', req.status === 'rejected' ? 'bg-red-500' : 'bg-primary')}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+      <p className="text-muted-foreground mt-1.5" style={{ fontSize: '10px' }}>
+        Step {req.currentStep} of {req.workflow.length}
+      </p>
+    </motion.button>
+  );
+}
 
 function RequestRow({ req, onClick }: { req: Request; onClick: () => void }) {
   const statusCfg = STATUS_CONFIG[req.status];
@@ -124,8 +171,15 @@ const ALL_STATUSES: Array<{ value: string; label: string }> = [
   { value: 'completed', label: 'Completed' },
 ];
 
-export function MyRequestsPage() {
+export function MyRequestsPage({
+  publicMode = false,
+  onViewDetail,
+}: {
+  publicMode?: boolean;
+  onViewDetail?: () => void;
+} = {}) {
   const { requests, navigate, setSelectedRequest, currentUser, refreshRequests } = useApp();
+  const routerNavigate = useNavigate();
   useScreenRefresh(refreshRequests);
   const isEmployee = currentUser?.role === 'employee';
   const [search, setSearch] = useState('');
@@ -146,7 +200,11 @@ export function MyRequestsPage() {
 
   const handleView = (req: Request) => {
     setSelectedRequest(req);
-    navigate('request-detail');
+    if (publicMode) {
+      onViewDetail?.();
+    } else {
+      navigate('request-detail');
+    }
   };
 
   const counts = {
@@ -157,9 +215,9 @@ export function MyRequestsPage() {
   };
 
   return (
-    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-6 space-y-5 w-full">
+    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="p-4 sm:p-6 space-y-4 sm:space-y-5 w-full">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>
             {isEmployee ? 'My Requests' : 'All Requests'}
@@ -170,8 +228,8 @@ export function MyRequestsPage() {
         </div>
         <motion.button
           whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
-          onClick={() => navigate('service-catalog')}
-          className="flex items-center gap-2 px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+          onClick={() => (publicMode ? routerNavigate('/') : navigate('service-catalog'))}
+          className="flex items-center justify-center gap-2 w-full sm:w-auto px-4 py-2.5 sm:py-2 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
           style={{ fontSize: '13px', fontWeight: 500 }}
         >
           <FileText className="size-4" />
@@ -197,54 +255,70 @@ export function MyRequestsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex items-center gap-3 flex-wrap">
-        <div className="relative">
+      <div className="flex flex-col sm:flex-row sm:flex-wrap sm:items-center gap-3">
+        <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search requests..."
-            className="w-56 h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            style={{ fontSize: '13px' }}
+            className="w-full sm:w-56 h-10 sm:h-9 pl-9 pr-4 rounded-lg border border-border bg-card text-foreground placeholder:text-muted-foreground outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+            style={{ fontSize: '16px' }}
           />
         </div>
 
-        <div className="relative">
-          <select
-            value={statusFilter}
-            onChange={e => setStatusFilter(e.target.value)}
-            className="h-9 pl-3 pr-8 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
-            style={{ fontSize: '12px' }}
-          >
-            {ALL_STATUSES.map(s => (
-              <option key={s.value} value={s.value}>{s.label}</option>
-            ))}
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
+          <div className="relative">
+            <select
+              value={statusFilter}
+              onChange={e => setStatusFilter(e.target.value)}
+              className="w-full h-10 sm:h-9 pl-3 pr-8 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
+              style={{ fontSize: '14px' }}
+            >
+              {ALL_STATUSES.map(s => (
+                <option key={s.value} value={s.value}>{s.label}</option>
+              ))}
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          </div>
+
+          <div className="relative">
+            <select
+              value={priorityFilter}
+              onChange={e => setPriorityFilter(e.target.value)}
+              className="w-full h-10 sm:h-9 pl-3 pr-8 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
+              style={{ fontSize: '14px' }}
+            >
+              <option value="">All Priority</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+            <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
+          </div>
         </div>
 
-        <div className="relative">
-          <select
-            value={priorityFilter}
-            onChange={e => setPriorityFilter(e.target.value)}
-            className="h-9 pl-3 pr-8 rounded-lg border border-border bg-card text-foreground outline-none focus:ring-2 focus:ring-primary/30 appearance-none cursor-pointer"
-            style={{ fontSize: '12px' }}
-          >
-            <option value="">All Priority</option>
-            <option value="high">High</option>
-            <option value="medium">Medium</option>
-            <option value="low">Low</option>
-          </select>
-          <ChevronDown className="absolute right-2 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground pointer-events-none" />
-        </div>
-
-        <div className="ml-auto text-muted-foreground" style={{ fontSize: '12px' }}>
+        <div className="text-muted-foreground sm:ml-auto" style={{ fontSize: '12px' }}>
           {filtered.length} of {requests.length} request{requests.length !== 1 ? 's' : ''}
         </div>
       </div>
 
-      {/* Table */}
-      <Card className="border-border/60 shadow-sm overflow-hidden">
+      {/* Mobile cards */}
+      <div className="md:hidden space-y-3">
+        {filtered.length === 0 ? (
+          <div className="py-12 text-center rounded-xl border border-border/60 bg-card">
+            <FileText className="size-10 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No requests found</p>
+          </div>
+        ) : (
+          filtered.map(req => (
+            <RequestMobileCard key={req.id} req={req} onClick={() => handleView(req)} />
+          ))
+        )}
+      </div>
+
+      {/* Desktop table */}
+      <Card className="hidden md:block border-border/60 shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>

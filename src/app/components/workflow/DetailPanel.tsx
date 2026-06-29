@@ -11,7 +11,7 @@ import type { WFRequest, WFStep } from '../../data/workflowData';
 import { PRIORITY_CONFIG } from '../../data/workflowData';
 import { RippleButton } from '../animations/RippleButton';
 import { UserAvatar } from '../ui/user-avatar';
-import { fetchEmployeeTiered } from '../../utils/fetchEmployeeTiered';
+import { verifyStaffInHrms } from '../../utils/fetchEmployeeTiered';
 import type { Approver, Employee } from '../../types';
 import { hasAdminAccess } from '../../utils/roleAccess';
 import { api } from '../../services/api';
@@ -302,13 +302,14 @@ export function DetailPanel({
     const timer = window.setTimeout(() => {
       setAssignVerifying(true);
       setAssignEmployee(null);
-      void fetchEmployeeTiered(id, undefined, setAssignEmployee).then((emp) => {
+      void verifyStaffInHrms(id).then((emp) => {
         if (assignStaffId.trim() !== id) return;
+        setAssignEmployee(emp);
         if (emp) lastVerifiedAssignId.current = id;
         else lastVerifiedAssignId.current = '';
         setAssignVerifying(false);
       });
-    }, 400);
+    }, 500);
 
     return () => window.clearTimeout(timer);
   }, [assignStaffId]);
