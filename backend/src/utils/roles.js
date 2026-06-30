@@ -1,10 +1,15 @@
 export const SUPER_ADMIN_ROLES = ['super_admin', 'admin'];
+export const MD_ROLES = ['md'];
 export const HOD_ROLES = ['hod'];
 export const PROCESSOR_ROLES = ['processor', 'it_team', 'hr_team', 'finance_team'];
 export const EMPLOYEE_ROLES = ['employee'];
 
 export function isSuperAdmin(role) {
   return SUPER_ADMIN_ROLES.includes(role);
+}
+
+export function isMd(role) {
+  return role === 'md';
 }
 
 export function isHod(role) {
@@ -20,7 +25,11 @@ export function isProcessor(role) {
 }
 
 export function hasStaffAccess(role) {
-  return isSuperAdmin(role) || isHod(role) || isProcessor(role);
+  return isSuperAdmin(role) || isMd(role) || isHod(role) || isProcessor(role);
+}
+
+export function canSeeAllDepartments(role) {
+  return isSuperAdmin(role) || isMd(role);
 }
 
 export function authorizeRole(userRole, allowedRoles) {

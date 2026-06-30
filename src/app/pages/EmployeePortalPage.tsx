@@ -7,7 +7,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
-import { getAccessTier } from '../utils/roleAccess';
+import { getAccessTier, canSeeAllStaff } from '../utils/roleAccess';
 import { api } from '../services/api';
 import type { Employee, Request } from '../types';
 import { getEmployeeProfileFields } from '../utils/employeeProfileFields';
@@ -130,7 +130,7 @@ export function EmployeePortalPage() {
   const isEmployeeView = accessTier === 'employee' && Boolean(currentUser?.employeeId);
 
   const portalSubtitle = (() => {
-    if (accessTier === 'super_admin') {
+    if (canSeeAllStaff(currentUser?.role)) {
       return 'Look up any staff ID to view and track their form requests across all departments.';
     }
     if (accessTier === 'hod') {

@@ -74,6 +74,9 @@ export class RequestService {
     if (!formMeta) throw new AppError('Form not found or inactive', 404);
 
     const workflow = await workflowEngine.buildWorkflow(formMeta.workflowTemplateId, employee);
+    if (formMeta.mdApprove) {
+      workflowEngine.injectMdApprovalStep(workflow);
+    }
     const dueDate = new Date();
     dueDate.setHours(dueDate.getHours() + (formMeta.slaHours || 48));
 

@@ -40,7 +40,7 @@ const updateUserSchema = z.object({
   body: z.object({
     name: z.string().min(1).optional(),
     department: z.string().min(1).optional(),
-    role: z.enum(['employee', 'hod']).optional(),
+    role: z.enum(['employee', 'hod', 'md']).optional(),
     active: z.boolean().optional(),
   }),
 });
@@ -48,7 +48,7 @@ const updateUserSchema = z.object({
 const createUserSchema = z.object({
   body: z.object({
     staffId: z.string().min(1),
-    role: z.enum(['employee', 'hod']).optional(),
+    role: z.enum(['employee', 'hod', 'md']).optional(),
   }),
 });
 
@@ -73,7 +73,7 @@ const importUsersSchema = z.object({
       staffId: z.string().min(1).optional(),
       staff_id: z.string().min(1).optional(),
       employeeId: z.string().min(1).optional(),
-      role: z.enum(['employee', 'hod']).optional(),
+      role: z.enum(['employee', 'hod', 'md']).optional(),
     }).refine((u) => u.staffId || u.staff_id || u.employeeId, {
       message: 'Each entry needs staffId, staff_id, or employeeId',
     })).min(1),

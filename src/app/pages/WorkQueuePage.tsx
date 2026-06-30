@@ -8,6 +8,7 @@ import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { isMdRole } from '../utils/roleAccess';
 
 type QueueStatus = 'pending' | 'in_progress' | 'pending_hod_review' | 'completed' | 'cancelled';
 
@@ -32,10 +33,11 @@ const STATUS_CONFIG: Record<QueueStatus, { label: string; icon: React.ElementTyp
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'text-gray-600', bg: 'bg-gray-100 dark:bg-gray-800' },
 };
 
-function KanbanColumn({ title, items, status, color, onStatusChange, updating }: {
+function KanbanColumn({ title, items, status, color, onStatusChange, updating, readOnly }: {
   title: string; items: QueueItem[]; status: QueueStatus; color: string;
   onStatusChange: (id: string, newStatus: QueueStatus | 'finish') => void;
   updating: string | null;
+  readOnly?: boolean;
 }) {
   return (
     <div className="flex-1 min-w-[220px]">
@@ -80,7 +82,7 @@ function KanbanColumn({ title, items, status, color, onStatusChange, updating }:
                   <span className="text-primary" style={{ fontSize: '8px', fontWeight: 700 }}>{item.assignedTo.split(' ').map(n => n[0]).join('')}</span>
                 </div>
                 <span className="text-muted-foreground flex-1 truncate" style={{ fontSize: '10px' }}>{item.assignedTo}</span>
-                {item.queueStatus === 'pending' && (
+                {item.queueStatus === 'pending' && !readOnly && (
                   <button
                     disabled={isUpdating}
                     onClick={() => onStatusChange(item.id, 'in_progress')}
@@ -90,7 +92,7 @@ function KanbanColumn({ title, items, status, color, onStatusChange, updating }:
                     <Play className="size-2.5" /> Start
                   </button>
                 )}
-                {item.queueStatus === 'in_progress' && (
+                {item.queueStatus === 'in_progress' && !readOnly && (
                   <button
                     disabled={isUpdating}
                     onClick={() => onStatusChange(item.id, 'finish')}
@@ -125,6 +127,7 @@ export function WorkQueuePage() {
   const [employeeDeptFilter, setEmployeeDeptFilter] = useState('all');
 
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  const readOnlyQueue = isMdRole(currentUser?.role);
 
   useEffect(() => {
     if (!isSuperAdmin) return;
@@ -285,6 +288,7 @@ export function WorkQueuePage() {
             color="bg-amber-50 dark:bg-amber-950/50"
             onStatusChange={handleStatusChange}
             updating={updating}
+            readOnly={readOnlyQueue}
           />
           <KanbanColumn
             title="In Progress"
@@ -293,6 +297,7 @@ export function WorkQueuePage() {
             color="bg-blue-50 dark:bg-blue-950/50"
             onStatusChange={handleStatusChange}
             updating={updating}
+            readOnly={readOnlyQueue}
           />
           <KanbanColumn
             title="Awaiting Confirmation"
@@ -301,6 +306,7 @@ export function WorkQueuePage() {
             color="bg-purple-50 dark:bg-purple-950/50"
             onStatusChange={handleStatusChange}
             updating={updating}
+            readOnly={readOnlyQueue}
           />
           <KanbanColumn
             title="Completed"
@@ -309,6 +315,7 @@ export function WorkQueuePage() {
             color="bg-emerald-50 dark:bg-emerald-950/50"
             onStatusChange={handleStatusChange}
             updating={updating}
+            readOnly={readOnlyQueue}
           />
           <KanbanColumn
             title="Cancelled"
@@ -317,6 +324,7 @@ export function WorkQueuePage() {
             color="bg-gray-100 dark:bg-gray-800/50"
             onStatusChange={handleStatusChange}
             updating={updating}
+            readOnly={readOnlyQueue}
           />
         </div>
       )}

@@ -15,7 +15,7 @@ import {
   SUPER_ADMIN_DEPARTMENT,
 } from '../seeds/superadmin.js';
 
-export const MANAGEABLE_ROLES = ['employee', 'hod'];
+export const MANAGEABLE_ROLES = ['employee', 'hod', 'md'];
 
 export class AuthService {
   async login(email, password, req) {

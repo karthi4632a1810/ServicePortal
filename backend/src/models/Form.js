@@ -10,6 +10,7 @@ const formSchema = new mongoose.Schema(
     icon: String,
     category: String,
     workflowTemplateId: { type: String, required: true },
+    mdApprove: { type: Boolean, default: false },
     currentVersion: { type: Number, default: 1 },
     filename: { type: String, required: true },
     active: { type: Boolean, default: true },

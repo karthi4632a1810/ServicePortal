@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'admin' | 'hod' | 'it_team' | 'hr_team' | 'finance_team' | 'processor' | 'employee';
+export type UserRole = 'super_admin' | 'admin' | 'md' | 'hod' | 'it_team' | 'hr_team' | 'finance_team' | 'processor' | 'employee';
 export type RequestStatus = 'submitted' | 'pending_approval' | 'approved' | 'rejected' | 'processing' | 'completed' | 'cancelled' | 'sent_back';
 export type FieldType =
   | 'text' | 'textarea' | 'number' | 'email' | 'phone' | 'date' | 'time'
@@ -101,6 +101,7 @@ export interface FormSchema {
   active: boolean;
   estimatedTime: string;
   slaHours: number;
+  mdApprove?: boolean;
 }
 
 export interface WorkflowStep {

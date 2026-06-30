@@ -28,7 +28,7 @@ searchRoutes.use(authenticate);
 searchRoutes.get('/', searchController.search);
 
 const auditRoutes = Router();
-auditRoutes.use(authenticate, authorize('super_admin', 'admin'));
+auditRoutes.use(authenticate, authorize('super_admin', 'admin', 'md'));
 auditRoutes.get('/', auditController.list);
 
 const departmentRoutes = Router();

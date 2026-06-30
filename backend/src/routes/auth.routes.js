@@ -11,7 +11,7 @@ router.patch('/me/preferences', authenticate, authController.updatePreferences);
 router.patch('/me/notification-preferences', authenticate, authController.updateNotificationPreferences);
 router.post('/me/change-password', authenticate, authController.changePassword);
 router.post('/logout', authenticate, authController.logout);
-router.get('/users', authenticate, authorize('super_admin'), authController.listUsers);
+router.get('/users', authenticate, authorize('super_admin', 'md'), authController.listUsers);
 router.post('/users', authenticate, authorize('super_admin'), authController.createUser);
 router.post('/users/import', authenticate, authorize('super_admin'), authController.importUsers);
 router.post('/users/bulk/role', authenticate, authorize('super_admin'), authController.bulkUpdateRole);

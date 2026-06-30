@@ -433,6 +433,7 @@ function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
 }
 
 function canActPending(req: Request, currentUser: Approver | null, variant: ApprovalsVariant) {
+  if (currentUser?.role === 'md') return false;
   const step = req.workflow[req.currentStep - 1];
   if (!step || step.status !== 'pending') return false;
   if (variant === 'approval') {

@@ -56,6 +56,19 @@ export class WorkflowEngine {
     return step.role || roleMap[step.department] || 'processor';
   }
 
+  injectMdApprovalStep(workflow) {
+    const hodIndex = workflow.findIndex((s) => s.type === 'hod');
+    const insertAt = hodIndex >= 0 ? hodIndex + 1 : 1;
+    workflow.splice(insertAt, 0, {
+      id: `wf-${uuidv4().slice(0, 8)}`,
+      name: 'MD Approval',
+      type: 'specific_role',
+      role: 'md',
+      status: 'pending',
+    });
+    return workflow;
+  }
+
   getCurrentStep(request) {
     return request.workflow[request.currentStep - 1] || null;
   }
@@ -81,6 +94,19 @@ export class WorkflowEngine {
         }
         return namesMatch(user.name, step.assignee);
       case 'specific_role':
+        if (!request?.assignedToEmployeeId && step.role) {
+          return user.role === step.role;
+        }
+        if (request?.assignedToEmployeeId) {
+          const empId = String(request.assignedToEmployeeId).trim();
+          const userEmpId = String(user.employeeId || '').trim();
+          if (empId && userEmpId && empId === userEmpId) return true;
+          if (request.assignedToUserId && String(request.assignedToUserId) === String(user._id)) return true;
+          const assignees = request.assignees || [];
+          if (assignees.some((a) => String(a.employeeId) === userEmpId)) return true;
+          return false;
+        }
+        return user.role === step.role;
       case 'department_processor':
         if (request?.assignedToEmployeeId) {
           const empId = String(request.assignedToEmployeeId).trim();
@@ -91,7 +117,7 @@ export class WorkflowEngine {
           if (assignees.some((a) => String(a.employeeId) === userEmpId)) return true;
           return false;
         }
-        if (!request?.receiverApprovedBy && step.type === 'department_processor') {
+        if (!request?.receiverApprovedBy) {
           if (isSuperAdmin(user.role)) return true;
           if (!isHod(user.role)) return false;
           return departmentsMatch(user.department, request?.department || request?.employee?.department);

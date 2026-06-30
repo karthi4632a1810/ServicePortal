@@ -13,7 +13,7 @@ import { RippleButton } from '../animations/RippleButton';
 import { UserAvatar } from '../ui/user-avatar';
 import { verifyStaffInHrms } from '../../utils/fetchEmployeeTiered';
 import type { Approver, Employee } from '../../types';
-import { hasAdminAccess } from '../../utils/roleAccess';
+import { hasAdminAccess, isMdRole } from '../../utils/roleAccess';
 import { api } from '../../services/api';
 import { formatRequestAnswers, getRequestSummaryRows, type FormattedAnswerRow } from '../../utils/formatRequestAnswers';
 
@@ -319,6 +319,11 @@ export function DetailPanel({
   const activeStepType = activeStep?.type;
   const requesterHodApproved = request?.steps[0]?.status === 'done';
   const isHodStep = activeStepType === 'hod' && request?.status === 'pending_approval';
+  const isMdStep = activeStepType === 'specific_role'
+    && activeStep?.role === 'md'
+    && request?.status === 'pending_approval';
+  const canMdApprove = Boolean(isMdStep && currentUser && isMdRole(currentUser.role));
+  const canHodApprove = Boolean(isHodStep && currentUser && !isMdRole(currentUser.role));
   const isProcessorStep = activeStepType === 'department_processor'
     && ['pending_approval', 'processing'].includes(request?.status || '');
   const receiverAccepted = request?.receiverAcceptedBy || request?.receiverApprovedBy;
@@ -326,20 +331,22 @@ export function DetailPanel({
     isProcessorStep && !receiverAccepted && requesterHodApproved,
   );
   const canReceiverAccept = Boolean(
-    needsReceiverAccept && currentUser && isReceiverDeptHod(currentUser, request),
+    needsReceiverAccept && currentUser && isReceiverDeptHod(currentUser, request) && !isMdRole(currentUser.role),
   );
   const canConfirmCompletion = Boolean(
     isProcessorStep
     && request?.queueStatus === 'pending_hod_review'
     && currentUser
-    && isReceiverDeptHod(currentUser, request),
+    && isReceiverDeptHod(currentUser, request)
+    && !isMdRole(currentUser.role),
   );
   const canAssign = Boolean(
     isProcessorStep
     && receiverAccepted
     && !['in_progress', 'pending_hod_review', 'completed'].includes(request?.queueStatus || '')
     && currentUser
-    && isReceiverDeptHod(currentUser, request),
+    && isReceiverDeptHod(currentUser, request)
+    && !isMdRole(currentUser.role),
   );
   const isAssignee = Boolean(
     currentUser
@@ -355,11 +362,12 @@ export function DetailPanel({
     && request.status !== 'completed'
     && request.status !== 'rejected'
     && (
-      (isHodStep && onApprove)
+      (canHodApprove && onApprove)
+      || (canMdApprove && onApprove)
       || (canReceiverAccept && onAcceptProcessing)
       || (canAssign && onAssign)
       || canConfirmCompletion
-      || (isProcessorStep && request.assignedToEmployeeId && !canAssign && !canReceiverAccept && !canConfirmCompletion)
+      || (isProcessorStep && request.assignedToEmployeeId && !canAssign && !canReceiverAccept && !canConfirmCompletion && !isMdRole(currentUser?.role))
     ),
   );
 
@@ -858,8 +866,13 @@ export function DetailPanel({
                   </p>
                 )}
 
-                {isHodStep && onApprove && (
+                {(canHodApprove || canMdApprove) && onApprove && (
                   <div className="space-y-2">
+                    {canMdApprove && (
+                      <p className="text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>
+                        MANAGING DIRECTOR — APPROVAL REQUIRED
+                      </p>
+                    )}
                     <textarea
                       value={remarks}
                       onChange={e => setRemarks(e.target.value)}

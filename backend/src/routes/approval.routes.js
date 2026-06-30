@@ -5,7 +5,7 @@ import { authenticate, authorize } from '../middleware/auth.js';
 const router = Router();
 
 router.use(authenticate);
-router.use(authorize('super_admin', 'admin', 'hod', 'processor', 'it_team', 'hr_team', 'finance_team'));
+router.use(authorize('super_admin', 'admin', 'md', 'hod', 'processor', 'it_team', 'hr_team', 'finance_team'));
 
 router.get('/summary', approvalController.summary);
 router.get('/', approvalController.list);

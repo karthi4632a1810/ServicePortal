@@ -48,6 +48,7 @@ export class FormService {
       id: formMeta.formId,
       version: formMeta.currentVersion,
       workflowTemplateId: formMeta.workflowTemplateId,
+      mdApprove: formMeta.mdApprove === true,
     };
   }
 
@@ -228,6 +229,7 @@ export class FormService {
           icon: schema.icon,
           category: DEFAULT_FORM_CATEGORY,
           workflowTemplateId: schema.workflowTemplateId || 'wf-hod-then-processor',
+          mdApprove: schema.md_approve === true || schema.mdApprove === true,
           currentVersion: schema.version,
           filename: relativeFilename,
           estimatedTime: schema.estimatedTime,

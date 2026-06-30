@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { api } from '../services/api';
-import { getRoleLabel, MANAGEABLE_ROLES, isFixedSuperAdmin } from '../utils/roleAccess';
+import { getRoleLabel, MANAGEABLE_ROLES, isFixedSuperAdmin, isReadOnlyRole } from '../utils/roleAccess';
 import type { Approver, UserRole } from '../types';
 import {
   Dialog,
@@ -20,6 +20,7 @@ import { RippleButton } from '../components/animations/RippleButton';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { useApp } from '../context/AppContext';
 
 const IMPORT_EXAMPLE = `[
   { "staffId": "60467", "role": "employee" },
@@ -261,6 +262,8 @@ function ImportUsersDialog({
 }
 
 export function UserManagementPage() {
+  const { currentUser } = useApp();
+  const readOnly = isReadOnlyRole(currentUser?.role);
   const [users, setUsers] = useState<Approver[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -403,18 +406,24 @@ export function UserManagementPage() {
         <div>
           <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 600 }}>User Management</h1>
           <p className="text-muted-foreground" style={{ fontSize: '13px' }}>
-            Add staff by ID, assign roles, import JSON, and manage passwords.
+            {readOnly
+              ? 'View all portal users and their roles (read-only).'
+              : 'Add staff by ID, assign roles, import JSON, and manage passwords.'}
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
-          <button onClick={() => setImportOpen(true)} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card hover:bg-muted transition-colors" style={{ fontSize: '13px' }}>
-            <Upload className="size-4" />
-            Import JSON
-          </button>
-          <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity" style={{ fontSize: '13px', fontWeight: 500 }}>
-            <Plus className="size-4" />
-            Add User
-          </button>
+          {!readOnly && (
+            <>
+              <button onClick={() => setImportOpen(true)} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card hover:bg-muted transition-colors" style={{ fontSize: '13px' }}>
+                <Upload className="size-4" />
+                Import JSON
+              </button>
+              <button onClick={() => setAddOpen(true)} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity" style={{ fontSize: '13px', fontWeight: 500 }}>
+                <Plus className="size-4" />
+                Add User
+              </button>
+            </>
+          )}
           <button onClick={loadUsers} className="inline-flex items-center gap-2 h-9 px-3 rounded-lg border border-border bg-card hover:bg-muted transition-colors" style={{ fontSize: '13px' }}>
             <RefreshCw className={cn('size-4', loading && 'animate-spin')} />
             Refresh
@@ -468,7 +477,7 @@ export function UserManagementPage() {
             </select>
           </div>
 
-          {selected.size > 0 && (
+          {!readOnly && selected.size > 0 && (
             <div className="flex flex-wrap items-center gap-2 p-3 rounded-lg bg-muted/50 border border-border">
               <span className="text-muted-foreground" style={{ fontSize: '12px' }}>Bulk actions:</span>
               <select
@@ -506,9 +515,14 @@ export function UserManagementPage() {
               <thead>
                 <tr className="border-t border-b border-border bg-muted/40 text-left">
                   <th className="px-4 py-3 w-10">
-                    <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} aria-label="Select all" />
+                    {!readOnly && (
+                      <input type="checkbox" checked={allFilteredSelected} onChange={toggleAll} aria-label="Select all" />
+                    )}
                   </th>
-                  {['Name', 'Staff ID', 'Email', 'Role', 'Department', 'Status', 'Actions'].map((h) => (
+                  {(readOnly
+                    ? ['Name', 'Staff ID', 'Email', 'Role', 'Department', 'Status']
+                    : ['Name', 'Staff ID', 'Email', 'Role', 'Department', 'Status', 'Actions']
+                  ).map((h) => (
                     <th key={h} className="px-4 py-3 text-muted-foreground font-medium" style={{ fontSize: '11px' }}>{h}</th>
                   ))}
                 </tr>
@@ -519,13 +533,15 @@ export function UserManagementPage() {
                   return (
                   <tr key={user.id} className={cn('border-b border-border/60 hover:bg-muted/20', selected.has(user.id) && 'bg-primary/5')}>
                     <td className="px-4 py-3">
-                      <input
-                        type="checkbox"
-                        checked={selected.has(user.id)}
-                        onChange={() => toggleOne(user.id)}
-                        disabled={locked}
-                        aria-label={`Select ${user.name}`}
-                      />
+                      {!readOnly && (
+                        <input
+                          type="checkbox"
+                          checked={selected.has(user.id)}
+                          onChange={() => toggleOne(user.id)}
+                          disabled={locked}
+                          aria-label={`Select ${user.name}`}
+                        />
+                      )}
                     </td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2.5">
@@ -540,6 +556,8 @@ export function UserManagementPage() {
                         <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-primary/10 text-primary" style={{ fontSize: '11px' }}>
                           Super Admin (fixed)
                         </span>
+                      ) : readOnly ? (
+                        <span className="text-foreground" style={{ fontSize: '12px' }}>{getRoleLabel(user.role)}</span>
                       ) : (
                         <select
                           value={MANAGEABLE_ROLES.some((r) => r.value === user.role) ? user.role : 'employee'}
@@ -562,6 +580,7 @@ export function UserManagementPage() {
                         {user.active !== false ? 'Active' : 'Disabled'}
                       </span>
                     </td>
+                    {!readOnly && (
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
                         {!locked && (
@@ -581,6 +600,7 @@ export function UserManagementPage() {
                         )}
                       </div>
                     </td>
+                    )}
                   </tr>
                   );
                 })}

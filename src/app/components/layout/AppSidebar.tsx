@@ -80,7 +80,17 @@ function useNavBadges(
         && departmentsMatch(currentUser.department, r.department);
     }).length,
     'my-tasks': myTasks,
-    'workflow-pipeline': requests.filter((r) => isPipelineRequest(r) && !['completed', 'rejected', 'cancelled'].includes(r.status)).length,
+    'workflow-pipeline': requests.filter((r) => {
+      if (!isPipelineRequest(r) || ['completed', 'rejected', 'cancelled'].includes(r.status)) return false;
+      if (currentUser?.role === 'md') {
+        const step = r.workflow[r.currentStep - 1];
+        return r.status === 'pending_approval'
+          && step?.type === 'specific_role'
+          && step?.role === 'md'
+          && step?.status === 'pending';
+      }
+      return true;
+    }).length,
     'work-queue': requests.filter(r => ['approved', 'processing'].includes(r.status)).length,
   };
 }

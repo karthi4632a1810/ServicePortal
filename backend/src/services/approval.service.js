@@ -256,7 +256,13 @@ export class ApprovalService {
       stepName: step?.name,
     });
 
-    if (action === 'approve') await notificationService.notifyApproved(request, user);
+    if (action === 'approve') {
+      if (request.status === 'pending_approval') {
+        await notificationService.notifyApprovalRequired(request);
+      } else {
+        await notificationService.notifyApproved(request, user);
+      }
+    }
     if (action === 'reject') await notificationService.notifyRejected(request, user);
     if (request.status === 'completed') await notificationService.notifyCompleted(request);
 

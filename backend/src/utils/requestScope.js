@@ -1,4 +1,4 @@
-import { isHod, isSuperAdmin, isEmployee } from './roles.js';
+import { isHod, isSuperAdmin, isEmployee, isMd } from './roles.js';
 
 export function escapeRegex(value) {
   return String(value || '').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -11,9 +11,9 @@ export function departmentsMatch(a, b) {
   return na === nb || na.includes(nb) || nb.includes(na);
 }
 
-/** MongoDB filter: super admin sees all; HOD sees own department only. */
+/** MongoDB filter: super admin / MD see all; HOD sees own department only. */
 export function getRequestDepartmentFilter(user) {
-  if (!user || isSuperAdmin(user.role)) return {};
+  if (!user || isSuperAdmin(user.role) || isMd(user.role)) return {};
   if (isHod(user.role) && user.department) {
     const dept = escapeRegex(user.department.trim());
     const re = new RegExp(`^${dept}$`, 'i');
@@ -32,7 +32,7 @@ export function mergeRequestScope(baseFilter, user) {
 }
 
 export function canAccessRequest(user, request) {
-  if (!user || isSuperAdmin(user.role)) return true;
+  if (!user || isSuperAdmin(user.role) || isMd(user.role)) return true;
   if (isHod(user.role)) {
     const dept = request?.department || request?.employee?.department;
     return departmentsMatch(user.department, dept);
@@ -52,7 +52,7 @@ export function canAccessRequest(user, request) {
 }
 
 export function canTrackEmployee(user, employeeDepartment) {
-  if (!user || isSuperAdmin(user.role)) return true;
+  if (!user || isSuperAdmin(user.role) || isMd(user.role)) return true;
   if (isHod(user.role)) return departmentsMatch(user.department, employeeDepartment);
   if (isEmployee(user.role)) return true;
   return true;

@@ -31,7 +31,30 @@ const SUPER_ADMIN_PAGES: Page[] = [
   'settings',
 ];
 
-export type AccessTier = 'super_admin' | 'hod' | 'staff' | 'employee';
+/** MD: read-only oversight — approve only on MD workflow step via Workflow Pipeline detail panel. */
+const MD_PAGES: Page[] = [
+  'dashboard',
+  'employee-portal',
+  'service-catalog',
+  'my-requests',
+  'accept',
+  'workflow-pipeline',
+  'work-queue',
+  'user-management',
+  'audit-log',
+  'settings',
+  'request-detail',
+];
+
+export type AccessTier = 'super_admin' | 'md' | 'hod' | 'staff' | 'employee';
+
+export function isMdRole(role: UserRole | undefined): boolean {
+  return role === 'md';
+}
+
+export function isReadOnlyRole(role: UserRole | undefined): boolean {
+  return isMdRole(role);
+}
 
 export function hasAdminAccess(role: UserRole | undefined): boolean {
   if (!role) return false;
@@ -44,6 +67,7 @@ export function isEmployeeSession(role: UserRole | undefined): boolean {
 
 export function getAccessTier(role: UserRole): AccessTier {
   if (role === 'super_admin' || role === 'admin') return 'super_admin';
+  if (role === 'md') return 'md';
   if (role === 'hod') return 'hod';
   if (role === 'employee') return 'employee';
   return 'staff';
@@ -51,7 +75,8 @@ export function getAccessTier(role: UserRole): AccessTier {
 
 export function canAccessPage(role: UserRole | undefined, page: Page): boolean {
   if (!role) return false;
-  if (page === 'user-management') return role === 'super_admin';
+  if (role === 'md') return MD_PAGES.includes(page);
+  if (page === 'user-management') return role === 'super_admin' || role === 'md';
   const tier = getAccessTier(role);
   if (tier === 'super_admin') return SUPER_ADMIN_PAGES.includes(page);
   if (tier === 'staff') return STAFF_PAGES.includes(page);
@@ -59,9 +84,20 @@ export function canAccessPage(role: UserRole | undefined, page: Page): boolean {
   return EMPLOYEE_PAGES.includes(page);
 }
 
+export function canSeeAllStaff(role: UserRole | undefined): boolean {
+  if (!role) return false;
+  return role === 'super_admin' || role === 'admin' || role === 'md';
+}
+
+/** MD may approve/reject only on their workflow step — not other write actions. */
+export function canMdApproveStep(stepType?: string, stepRole?: string): boolean {
+  return stepType === 'specific_role' && stepRole === 'md';
+}
+
 export function getDefaultPage(role: UserRole): Page {
   const tier = getAccessTier(role);
   if (tier === 'employee') return 'employee-portal';
+  if (tier === 'md') return 'dashboard';
   if (tier === 'hod') return 'approvals';
   if (tier === 'staff') return 'work-queue';
   return 'dashboard';
@@ -70,6 +106,7 @@ export function getDefaultPage(role: UserRole): Page {
 export const MANAGEABLE_ROLES = [
   { value: 'employee' as UserRole, label: 'Employee' },
   { value: 'hod' as UserRole, label: 'HOD' },
+  { value: 'md' as UserRole, label: 'Managing Director' },
 ];
 
 export const SUPER_ADMIN_STAFF_ID = '12345';
@@ -85,6 +122,7 @@ export function getRoleLabel(role: UserRole): string {
   const labels: Record<UserRole, string> = {
     super_admin: 'Super Admin',
     admin: 'Admin',
+    md: 'Managing Director',
     hod: 'Department HOD',
     employee: 'Employee',
     processor: 'Processor',
