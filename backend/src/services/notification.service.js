@@ -61,7 +61,7 @@ export class NotificationService {
   }
 
   async notifyApprovalRequired(request) {
-    const step = request.workflow[0];
+    const step = request.workflow[(request.currentStep ?? 1) - 1];
     let users = [];
 
     if (step?.assignee) {

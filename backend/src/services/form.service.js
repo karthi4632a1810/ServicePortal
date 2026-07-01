@@ -48,8 +48,20 @@ export class FormService {
       id: formMeta.formId,
       version: formMeta.currentVersion,
       workflowTemplateId: formMeta.workflowTemplateId,
-      mdApprove: formMeta.mdApprove === true,
+      mdApprove: formMeta.mdApprove === true || schema.md_approve === true || schema.mdApprove === true,
     };
+  }
+
+  async resolveMdApprove(formId) {
+    const formMeta = await Form.findOne({ formId, active: true });
+    if (!formMeta) return false;
+    if (formMeta.mdApprove === true) return true;
+    try {
+      const schema = enrichLoadedSchema(await loadFormJson(formMeta.filename));
+      return schema.md_approve === true || schema.mdApprove === true;
+    } catch {
+      return false;
+    }
   }
 
   async getFormById(formId) {

@@ -71,6 +71,7 @@ const requestSchema = new mongoose.Schema(
     formId: { type: String, required: true, index: true },
     formTitle: String,
     formVersion: Number,
+    mdApprove: { type: Boolean, default: false },
     department: String,
     category: String,
     employee: employeeSnapshotSchema,

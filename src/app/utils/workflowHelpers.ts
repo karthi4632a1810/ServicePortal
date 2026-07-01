@@ -29,3 +29,12 @@ export function canReceiverHodAcceptNow(req: Request): boolean {
   if (mdStep && mdStep.status !== 'approved') return false;
   return req.status === 'pending_approval' || req.status === 'processing';
 }
+
+/** Dept accept is visible but blocked until MD approves (e.g. before workflow repair loads). */
+export function isAwaitingMdBeforeAccept(req: Request): boolean {
+  const mdStep = findMdApprovalStep(req.workflow);
+  if (!mdStep || mdStep.status === 'approved') return false;
+  const step = req.workflow[req.currentStep - 1];
+  if (step?.type !== 'department_processor') return false;
+  return !req.receiverAcceptedBy && !req.receiverApprovedBy;
+}

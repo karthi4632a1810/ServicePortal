@@ -12,7 +12,7 @@ import formService from './form.service.js';
 import notificationService from './notification.service.js';
 import { mergeRequestScope, canAccessRequest, departmentsMatch } from '../utils/requestScope.js';
 import { isSuperAdmin, isHod, hasStaffAccess } from '../utils/roles.js';
-import { canReceiverHodAcceptNow } from '../utils/workflowHelpers.js';
+import { canReceiverHodAcceptNow, repairMdWorkflowIfNeeded, isMdApprovalPending } from '../utils/workflowHelpers.js';
 
 function mapRequestToFrontend(doc) {
   const r = doc.toObject ? doc.toObject() : doc;
@@ -57,7 +57,21 @@ function mapRequestToFrontend(doc) {
     })),
     dueDate: r.dueDate?.toISOString?.() || r.dueDate,
     queueStatus: r.queueStatus,
+    mdApprove: r.mdApprove === true,
   };
+}
+
+async function ensureMdWorkflow(request) {
+  const mdApprove = await formService.resolveMdApprove(request.formId);
+  if (!mdApprove) return false;
+  const repaired = repairMdWorkflowIfNeeded(request, mdApprove);
+  if (repaired) {
+    await request.save();
+    if (isMdApprovalPending(request)) {
+      await notificationService.notifyApprovalRequired(request);
+    }
+  }
+  return repaired;
 }
 
 function withTaskType(doc, taskType) {
@@ -74,8 +88,9 @@ export class RequestService {
     const formMeta = await Form.findOne({ formId, active: true });
     if (!formMeta) throw new AppError('Form not found or inactive', 404);
 
+    const mdApprove = await formService.resolveMdApprove(formId);
     const workflow = await workflowEngine.buildWorkflow(formMeta.workflowTemplateId, employee);
-    if (formMeta.mdApprove) {
+    if (mdApprove) {
       workflowEngine.injectMdApprovalStep(workflow);
     }
     const dueDate = new Date();
@@ -86,6 +101,7 @@ export class RequestService {
       formId,
       formTitle: formMeta.title,
       formVersion: formMeta.currentVersion,
+      mdApprove,
       department: employee.department,
       category: formMeta.category,
       employee,
@@ -115,6 +131,7 @@ export class RequestService {
   async getRequestById(id) {
     const request = await Request.findById(id);
     if (!request) throw new AppError('Request not found', 404);
+    await ensureMdWorkflow(request);
     return mapRequestToFrontend(request);
   }
 
@@ -193,6 +210,9 @@ export class RequestService {
 
     const scopedQuery = mergeRequestScope(query, user);
     const { items, pagination } = await paginatedFind(Request, scopedQuery, options);
+    for (const item of items) {
+      await ensureMdWorkflow(item);
+    }
     return { requests: items.map(mapRequestToFrontend), pagination };
   }
 
@@ -221,6 +241,7 @@ export class RequestService {
   async acceptForProcessing(requestId, user, remarks) {
     const request = await Request.findById(requestId);
     if (!request) throw new AppError('Request not found', 404);
+    await ensureMdWorkflow(request);
     if (!canAccessRequest(user, request)) {
       throw new AppError('You do not have access to this request', 403);
     }

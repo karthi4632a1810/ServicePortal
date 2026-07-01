@@ -10,7 +10,7 @@ import { api } from '../services/api';
 import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
 import type { Request, Approver, Employee } from '../types';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
-import { canReceiverHodAcceptNow, isMdApprovalPending, findMdApprovalStep } from '../utils/workflowHelpers';
+import { canReceiverHodAcceptNow, isMdApprovalPending, findMdApprovalStep, isAwaitingMdBeforeAccept } from '../utils/workflowHelpers';
 import { isMdRole } from '../utils/roleAccess';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
@@ -76,6 +76,7 @@ function matchesVariant(
   const isPendingAcceptStep = Boolean(
     canReceiverHodAcceptNow(req),
   );
+  const awaitingMd = isAwaitingMdBeforeAccept(req);
   const userAccepted = Boolean(userName && receiverAccepted === userName);
   const userApprovedStep = req.workflow.some(
     (s) => APPROVAL_STEP_TYPES.has(s.type) && s.completedBy === userName && s.status === 'approved',
@@ -108,7 +109,7 @@ function matchesVariant(
   if (tab === 'pending') return isPendingAcceptStep;
   if (tab === 'approved') return userAccepted;
   if (tab === 'rejected') return false;
-  return req.workflow.some((s) => s.type === 'department_processor');
+  return req.workflow.some((s) => s.type === 'department_processor') || awaitingMd;
 }
 
 function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
@@ -132,7 +133,8 @@ function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
 
   const currentStep = req.workflow[req.currentStep - 1];
   const receiverAccepted = req.receiverAcceptedBy || req.receiverApprovedBy;
-  const isReceiverAccept = currentStep?.type === 'department_processor' && !receiverAccepted;
+  const awaitingMd = isAwaitingMdBeforeAccept(req);
+  const isReceiverAccept = currentStep?.type === 'department_processor' && !receiverAccepted && !awaitingMd;
   const isConfirmCompletion = currentStep?.type === 'department_processor' && req.queueStatus === 'pending_hod_review';
   const submittedDaysAgo = Math.floor((Date.now() - new Date(req.submittedAt).getTime()) / 86400000);
 
@@ -287,11 +289,17 @@ function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
               <Clock className="size-2.5 text-primary" />
             </div>
             <span className="text-primary" style={{ fontSize: '11px', fontWeight: 500 }}>
-              Awaiting: {currentStep.name}
-              {currentStep.assigneeEmployeeId && (
+              {awaitingMd ? 'Awaiting: MD Approval' : `Awaiting: ${currentStep.name}`}
+              {!awaitingMd && currentStep.assigneeEmployeeId && (
                 <> · Staff ID {currentStep.assigneeEmployeeId}</>
               )}
             </span>
+          </div>
+        )}
+        {awaitingMd && tab !== 'pending' && (
+          <div className="flex items-center gap-1.5 ml-auto text-amber-600" style={{ fontSize: '11px', fontWeight: 500 }}>
+            <Clock className="size-3.5" />
+            Awaiting MD Approval
           </div>
         )}
         {req.status === 'sent_back' && (
@@ -415,6 +423,8 @@ function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
                   ? 'Staff finished — confirm completion in My Tasks.'
                   : req.status === 'processing'
                   ? 'In department processing — assign and track from Workflow Pipeline.'
+                  : awaitingMd
+                    ? 'Managing Director must approve before this request can be accepted.'
                   : 'No action required on this step.'}
           </p>
         )}

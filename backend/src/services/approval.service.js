@@ -3,7 +3,9 @@ import workflowEngine from './workflowEngine.service.js';
 import hrmsService from './hrms.service.js';
 import { isSuperAdmin, isHod, isMd } from '../utils/roles.js';
 import { canAccessRequest, departmentsMatch, mergeRequestScope } from '../utils/requestScope.js';
-import { canReceiverHodAcceptNow, isMdApprovalPending } from '../utils/workflowHelpers.js';
+import { canReceiverHodAcceptNow, isMdApprovalPending, repairMdWorkflowIfNeeded } from '../utils/workflowHelpers.js';
+import formService from './form.service.js';
+import notificationService from './notification.service.js';
 import { AppError } from '../utils/response.js';
 
 const APPROVAL_STEP_TYPES = new Set(['hod', 'reporting_manager', 'specific_user', 'specific_role', 'parallel']);
@@ -113,11 +115,28 @@ function filterByStatus(accessible, user, status) {
   return accessible;
 }
 
+async function ensureMdWorkflow(request) {
+  const mdApprove = await formService.resolveMdApprove(request.formId);
+  if (!mdApprove) return false;
+  const repaired = repairMdWorkflowIfNeeded(request, mdApprove);
+  if (repaired) {
+    await request.save();
+    if (isMdApprovalPending(request)) {
+      await notificationService.notifyApprovalRequired(request);
+    }
+  }
+  return repaired;
+}
+
 export class ApprovalService {
   async loadAccessibleRequests(user) {
     const scopedQuery = mergeRequestScope({}, user);
     const allRequests = await Request.find(scopedQuery).sort('-submittedAt');
-    return allRequests.filter((req) => canAccessRequest(user, req));
+    const accessible = allRequests.filter((req) => canAccessRequest(user, req));
+    for (const req of accessible) {
+      await ensureMdWorkflow(req);
+    }
+    return accessible;
   }
 
   async getTabSummary(user) {
@@ -155,6 +174,7 @@ export class ApprovalService {
     if (!request) {
       throw new AppError('Request not found', 404);
     }
+    await ensureMdWorkflow(request);
 
     const step = workflowEngine.getCurrentStep(request);
     const isReceiverAcceptPhase = step?.type === 'department_processor' && !request.receiverApprovedBy;
