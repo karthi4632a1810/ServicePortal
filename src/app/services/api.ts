@@ -224,7 +224,7 @@ class ApiClient {
     return this.request<import('../types').Request[]>(`/requests/employee/${employeeId}`);
   }
 
-  createRequest(data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string; attachments?: unknown[] }) {
+  createRequest(data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string; attachments?: import('../types').Attachment[] }) {
     return this.request<import('../types').Request>('/requests', { method: 'POST', body: JSON.stringify(data) });
   }
 
@@ -366,14 +366,28 @@ class ApiClient {
   }
 
   // Upload
-  async uploadFile(file: File) {
+  async uploadFile(
+    file: File,
+    params: { formId: string; staffId: string; batchKey: string; fieldId?: string },
+  ) {
     const formData = new FormData();
     formData.append('file', file);
     const token = this.getToken();
     const headers: Record<string, string> = {};
     if (token) headers.Authorization = `Bearer ${token}`;
 
-    const res = await fetch(`${API_BASE}/upload`, { method: 'POST', body: formData, headers });
+    const query = new URLSearchParams({
+      formId: params.formId,
+      staffId: params.staffId,
+      batchKey: params.batchKey,
+    });
+    if (params.fieldId) query.set('fieldId', params.fieldId);
+
+    const res = await fetch(`${API_BASE}/upload?${query.toString()}`, {
+      method: 'POST',
+      body: formData,
+      headers,
+    });
     const json = await res.json();
     if (!res.ok || !json.success) throw new Error(json.message || 'Upload failed');
     return json;

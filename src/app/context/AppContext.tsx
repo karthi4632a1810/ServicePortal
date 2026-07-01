@@ -133,7 +133,7 @@ interface AppContextValue {
 
   fetchEmployee: (employeeId: string, phone?: string, onUpdate?: (employee: Employee) => void) => Promise<Employee | null>;
 
-  submitRequest: (data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string }) => Promise<Request>;
+  submitRequest: (data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string; attachments?: import('../types').Attachment[] }) => Promise<import('../types').Request>;
 
   performApprovalAction: (id: string, action: 'approve' | 'reject' | 'forward' | 'request-info', remarks?: string, staffId?: string) => Promise<Request>;
 
@@ -499,7 +499,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
 
-  const submitRequest = useCallback(async (data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string }) => {
+  const submitRequest = useCallback(async (data: { employeeId: string; formId: string; answers: Record<string, unknown>; priority?: string; attachments?: import('../types').Attachment[] }) => {
 
     const res = await api.createRequest(data);
 

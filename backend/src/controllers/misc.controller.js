@@ -4,6 +4,8 @@ import departmentService from '../services/department.service.js';
 import notificationService from '../services/notification.service.js';
 import { successResponse } from '../utils/response.js';
 import { formatFileSize } from '../utils/helpers.js';
+import { toRelativeUploadPath, toPublicUploadUrl } from '../utils/uploadPaths.js';
+import { v4 as uuidv4 } from 'uuid';
 import path from 'path';
 
 export const workflowController = {
@@ -148,12 +150,17 @@ export const uploadController = {
       if (!req.file) {
         return res.status(400).json({ success: false, message: 'No file uploaded' });
       }
+      const relativePath = toRelativeUploadPath(req.file.path);
       const data = {
-        id: req.file.filename,
+        id: `att-${uuidv4().slice(0, 8)}`,
         name: req.file.originalname,
         size: formatFileSize(req.file.size),
-        type: path.extname(req.file.originalname).slice(1) || 'file',
-        path: req.file.filename,
+        type: path.extname(req.file.originalname).slice(1).toLowerCase() || 'file',
+        path: relativePath,
+        url: toPublicUploadUrl(relativePath),
+        fieldId: req.uploadContext?.fieldId,
+        batchKey: req.uploadContext?.batchKey,
+        uploadedAt: new Date().toISOString(),
       };
       return successResponse(res, { message: 'File uploaded', data, statusCode: 201 });
     } catch (err) {

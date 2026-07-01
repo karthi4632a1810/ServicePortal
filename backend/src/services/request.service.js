@@ -37,7 +37,11 @@ function mapRequestToFrontend(doc) {
       ...c,
       timestamp: c.timestamp?.toISOString?.() || c.timestamp,
     })),
-    attachments: r.attachments,
+    attachments: (r.attachments || []).map((a) => ({
+      ...a,
+      url: a.path ? `/uploads/${String(a.path).replace(/\\/g, '/')}` : undefined,
+      uploadedAt: a.uploadedAt?.toISOString?.() || a.uploadedAt,
+    })),
     priority: r.priority,
     assignedTo: r.assignedTo,
     assignedToEmployeeId: r.assignedToEmployeeId,
@@ -96,6 +100,17 @@ export class RequestService {
     const dueDate = new Date();
     dueDate.setHours(dueDate.getHours() + (formMeta.slaHours || 48));
 
+    const normalizedAttachments = (attachments || []).map((a) => ({
+      id: a.id || `att-${uuidv4().slice(0, 8)}`,
+      name: a.name,
+      size: a.size,
+      type: a.type,
+      path: a.path,
+      fieldId: a.fieldId,
+      uploadedBy: employee.name,
+      uploadedAt: a.uploadedAt ? new Date(a.uploadedAt) : new Date(),
+    }));
+
     const request = await Request.create({
       requestNumber: generateRequestNumber(),
       formId,
@@ -117,7 +132,7 @@ export class RequestService {
         timestamp: new Date(),
         type: 'system',
       }],
-      attachments,
+      attachments: normalizedAttachments,
       priority,
       dueDate,
       slaHours: formMeta.slaHours,

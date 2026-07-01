@@ -169,6 +169,11 @@ export interface Attachment {
   name: string;
   size: string;
   type: string;
+  path?: string;
+  url?: string;
+  fieldId?: string;
+  batchKey?: string;
+  uploadedAt?: string;
 }
 
 export interface AuditLog {

@@ -9,7 +9,8 @@ import {
   uploadController,
 } from '../controllers/misc.controller.js';
 import { authenticate, authorize } from '../middleware/auth.js';
-import { upload } from '../middleware/upload.js';
+import { createUploadMiddleware } from '../middleware/upload.js';
+import { prepareUploadContext } from '../middleware/prepareUpload.js';
 
 const workflowRoutes = Router();
 workflowRoutes.get('/', workflowController.list);
@@ -40,7 +41,8 @@ notificationRoutes.use(authenticate);
 notificationRoutes.get('/', notificationController.list);
 
 const uploadRoutes = Router();
-uploadRoutes.post('/', upload.single('file'), uploadController.upload);
+const uploadHandler = createUploadMiddleware();
+uploadRoutes.post('/', prepareUploadContext, uploadHandler.single('file'), uploadController.upload);
 
 export {
   workflowRoutes,

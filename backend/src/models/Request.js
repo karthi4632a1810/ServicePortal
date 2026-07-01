@@ -42,6 +42,7 @@ const attachmentSchema = new mongoose.Schema(
     size: String,
     type: String,
     path: String,
+    fieldId: String,
     uploadedBy: String,
     uploadedAt: { type: Date, default: Date.now },
   },

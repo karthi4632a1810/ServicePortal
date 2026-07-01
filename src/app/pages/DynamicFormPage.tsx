@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate, useParams, useLocation } from 'react-router';
 import {
   ChevronLeft, Send, CheckCircle, Clock, Info, Upload,
-  Building2, AlertCircle, Loader2,
+  Building2, AlertCircle, Loader2, X, FileText,
 } from 'lucide-react';
 import { LottiePlayer } from '../components/animations/LottiePlayer';
 import { RippleButton } from '../components/animations/RippleButton';
@@ -21,9 +21,15 @@ import {
   getStaffIdFromAnswers,
 } from '../utils/hrmsVerificationFields';
 import { sanitizeUserFacingText } from '../utils/userFacingText';
-import type { FormField, FormSchema, FieldOption, Employee } from '../types';
+import {
+  formatUploadBatchKey,
+  formatUploadSize,
+  isAllowedUploadFile,
+  MAX_UPLOAD_BYTES,
+} from '../utils/uploadPaths';
+import type { FormField, FormSchema, FieldOption, Employee, Attachment } from '../types';
 
-function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesignations, selectedDepartmentId, hrmsFound, readOnly }: {
+function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesignations, selectedDepartmentId, hrmsFound, readOnly, pendingFiles, onFilesChange }: {
   field: FormField;
   value: unknown;
   onChange: (val: unknown) => void;
@@ -32,11 +38,31 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
   selectedDepartmentId: string;
   hrmsFound?: boolean | null;
   readOnly?: boolean;
+  pendingFiles?: File[];
+  onFilesChange?: (files: File[]) => void;
 }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
   const hrmsSource = getEffectiveHrmsSource(field);
   const isVerificationField = hrmsSource === 'staff_id';
   const isVerified = isVerificationField && hrmsFound === true;
   const isReadOnly = readOnly || isVerificationField;
+
+  const addFiles = (incoming: FileList | File[] | null) => {
+    if (!onFilesChange || !incoming?.length) return;
+    const next = [...(pendingFiles || [])];
+    for (const file of Array.from(incoming)) {
+      if (!isAllowedUploadFile(file)) continue;
+      next.push(file);
+    }
+    onFilesChange(next);
+  };
+
+  const removeFile = (index: number) => {
+    if (!onFilesChange) return;
+    onFilesChange((pendingFiles || []).filter((_, i) => i !== index));
+  };
+
   const inputClass = cn(
     'w-full h-10 px-3 rounded-lg border bg-input-background text-foreground placeholder:text-muted-foreground transition-all',
     isVerified
@@ -179,12 +205,65 @@ function FormFieldRenderer({ field, value, onChange, hrmsDepartments, hrmsDesign
           })}
         </div>
       ) : field.type === 'file' ? (
-        <div className="border-2 border-dashed border-border rounded-lg p-6 text-center hover:border-primary/50 transition-colors cursor-pointer">
-          <Upload className="size-6 text-muted-foreground mx-auto mb-2" />
-          <p className="text-muted-foreground" style={{ fontSize: '12px' }}>
-            Drop files here or <span className="text-primary">browse</span>
-          </p>
-          <p className="text-muted-foreground" style={{ fontSize: '10px' }}>PDF, JPG, PNG up to 10MB</p>
+        <div>
+          <input
+            ref={inputRef}
+            type="file"
+            className="hidden"
+            multiple
+            accept=".pdf,.jpg,.jpeg,.png,.gif,.doc,.docx,.xls,.xlsx"
+            onChange={(e) => {
+              addFiles(e.target.files);
+              e.target.value = '';
+            }}
+          />
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => inputRef.current?.click()}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') inputRef.current?.click(); }}
+            onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+            onDragLeave={() => setDragOver(false)}
+            onDrop={(e) => {
+              e.preventDefault();
+              setDragOver(false);
+              addFiles(e.dataTransfer.files);
+            }}
+            className={cn(
+              'border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer',
+              dragOver ? 'border-primary bg-primary/5' : 'border-border hover:border-primary/50',
+            )}
+          >
+            <Upload className="size-6 text-muted-foreground mx-auto mb-2" />
+            <p className="text-muted-foreground" style={{ fontSize: '12px' }}>
+              Drop files here or <span className="text-primary">browse</span>
+            </p>
+            <p className="text-muted-foreground" style={{ fontSize: '10px' }}>PDF, JPG, PNG up to 10MB</p>
+          </div>
+          {(pendingFiles?.length ?? 0) > 0 && (
+            <ul className="mt-3 space-y-2">
+              {pendingFiles!.map((file, index) => (
+                <li
+                  key={`${file.name}-${index}`}
+                  className="flex items-center gap-2 px-3 py-2 rounded-lg border border-border bg-muted/30"
+                >
+                  <FileText className="size-4 text-primary shrink-0" />
+                  <div className="flex-1 min-w-0 text-left">
+                    <p className="text-foreground truncate" style={{ fontSize: '12px' }}>{file.name}</p>
+                    <p className="text-muted-foreground" style={{ fontSize: '10px' }}>{formatUploadSize(file.size)}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeFile(index); }}
+                    className="p-1 rounded hover:bg-muted text-muted-foreground hover:text-destructive"
+                    aria-label={`Remove ${file.name}`}
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       ) : null}
 
@@ -217,6 +296,8 @@ export function DynamicFormPage() {
   const [hrmsRefreshing, setHrmsRefreshing] = useState(false);
   const [hrmsDepartments, setHrmsDepartments] = useState<FieldOption[]>([]);
   const [hrmsDesignations, setHrmsDesignations] = useState<FieldOption[]>([]);
+  const [pendingFiles, setPendingFiles] = useState<Record<string, File[]>>({});
+  const uploadBatchRef = useRef<string | null>(null);
 
   const form: FormSchema | null = isPublicForm
     ? forms.find(f => f.id === formId) ?? null
@@ -404,6 +485,19 @@ export function DynamicFormPage() {
     if (hrmsFound !== true) errs._hrms = hrmsError || 'Could not load your details. Check your Staff ID.';
     normalizedFields.forEach(f => {
       if (getEffectiveHrmsSource(f) === 'staff_id') return;
+      if (f.type === 'file') {
+        if (f.required && !(pendingFiles[f.id]?.length)) {
+          errs[f.id] = `${f.label} is required`;
+        }
+        (pendingFiles[f.id] || []).forEach((file) => {
+          if (file.size > MAX_UPLOAD_BYTES) {
+            errs[f.id] = `${file.name} exceeds 10MB limit`;
+          } else if (!isAllowedUploadFile(file)) {
+            errs[f.id] = `${file.name} is not an allowed file type`;
+          }
+        });
+        return;
+      }
       if (f.required && ['text', 'textarea', 'number', 'email', 'phone', 'date', 'time', 'dropdown', 'radio'].includes(f.type)) {
         if (!formData[f.id]) errs[f.id] = `${f.label} is required`;
       }
@@ -422,16 +516,45 @@ export function DynamicFormPage() {
       const hrmsPhone = hrmsEmployee?.mobile ? normalizePhoneInput(hrmsEmployee.mobile) : '';
       await saveEmployeeProfile({ employeeId: staffId, phone: hrmsPhone });
 
+      const batchKey = uploadBatchRef.current || formatUploadBatchKey(staffId);
+      uploadBatchRef.current = batchKey;
+
+      const attachments: Attachment[] = [];
+      const answers: Record<string, unknown> = { ...formData };
+
+      for (const field of normalizedFields) {
+        if (field.type !== 'file') continue;
+        const files = pendingFiles[field.id] || [];
+        const uploadedNames: string[] = [];
+        for (const file of files) {
+          const uploadRes = await api.uploadFile(file, {
+            formId: form.id,
+            staffId,
+            batchKey,
+            fieldId: field.id,
+          });
+          attachments.push(uploadRes.data);
+          uploadedNames.push(uploadRes.data.name);
+        }
+        if (uploadedNames.length) {
+          answers[field.id] = uploadedNames.join(', ');
+        } else {
+          delete answers[field.id];
+        }
+      }
+
       const result = await submitRequest({
         employeeId: staffId,
         formId: form.id,
-        answers: formData,
+        answers,
         priority: 'medium',
+        attachments,
       });
       setSubmittedRequestNumber(result.requestNumber);
       setSubmitted(true);
-    } catch {
-      setErrors({ _form: 'Failed to submit request. Please try again.' });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to submit request. Please try again.';
+      setErrors({ _form: message });
     } finally {
       setSubmitting(false);
     }
@@ -600,6 +723,10 @@ export function DynamicFormPage() {
                 selectedDepartmentId={selectedDepartmentId}
                 hrmsFound={hrmsFound}
                 readOnly={Boolean(currentUser?.employeeId && getEffectiveHrmsSource(field) === 'staff_id')}
+                pendingFiles={field.type === 'file' ? (pendingFiles[field.id] || []) : undefined}
+                onFilesChange={field.type === 'file'
+                  ? (files) => setPendingFiles((prev) => ({ ...prev, [field.id]: files }))
+                  : undefined}
               />
             ))}
           </div>

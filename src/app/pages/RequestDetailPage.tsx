@@ -211,14 +211,20 @@ export function RequestDetailPage({
               <CardContent>
                 <div className="space-y-2">
                   {req.attachments.map(att => (
-                    <div key={att.id} className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors cursor-pointer">
+                    <a
+                      key={att.id}
+                      href={att.url || (att.path ? `/uploads/${att.path}` : '#')}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors"
+                    >
                       <Paperclip className="size-4 text-muted-foreground" />
                       <div className="flex-1 min-w-0">
                         <p className="text-foreground truncate" style={{ fontSize: '13px' }}>{att.name}</p>
                         <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{att.size}</p>
                       </div>
                       <Download className="size-4 text-muted-foreground hover:text-primary transition-colors" />
-                    </div>
+                    </a>
                   ))}
                 </div>
               </CardContent>
