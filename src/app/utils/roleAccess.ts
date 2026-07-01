@@ -31,12 +31,13 @@ const SUPER_ADMIN_PAGES: Page[] = [
   'settings',
 ];
 
-/** MD: read-only oversight — approve only on MD workflow step via Workflow Pipeline detail panel. */
+/** MD: read-only oversight — MD approves on Approvals; HOD Accept only after MD. */
 const MD_PAGES: Page[] = [
   'dashboard',
   'employee-portal',
   'service-catalog',
   'my-requests',
+  'approvals',
   'accept',
   'workflow-pipeline',
   'work-queue',
@@ -97,7 +98,7 @@ export function canMdApproveStep(stepType?: string, stepRole?: string): boolean 
 export function getDefaultPage(role: UserRole): Page {
   const tier = getAccessTier(role);
   if (tier === 'employee') return 'employee-portal';
-  if (tier === 'md') return 'dashboard';
+  if (tier === 'md') return 'approvals';
   if (tier === 'hod') return 'approvals';
   if (tier === 'staff') return 'work-queue';
   return 'dashboard';

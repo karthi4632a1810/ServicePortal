@@ -9,6 +9,7 @@
   "estimatedTime": "2-3 business days",
   "slaHours": 72,
   "active": false,
+  "md_approve": true,
   "workflowTemplateId": "wf-hod-then-processor",
   "fields": [
     {

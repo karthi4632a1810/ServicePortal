@@ -10,6 +10,8 @@ import { api } from '../services/api';
 import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
 import type { Request, Approver, Employee } from '../types';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { canReceiverHodAcceptNow, isMdApprovalPending, findMdApprovalStep } from '../utils/workflowHelpers';
+import { isMdRole } from '../utils/roleAccess';
 
 const stagger = { hidden: {}, show: { transition: { staggerChildren: 0.06 } } };
 const fadeUp = { hidden: { opacity: 0, y: 10 }, show: { opacity: 1, y: 0 } };
@@ -72,9 +74,7 @@ function matchesVariant(
     step && APPROVAL_STEP_TYPES.has(step.type) && step.status === 'pending' && req.status === 'pending_approval',
   );
   const isPendingAcceptStep = Boolean(
-    step?.type === 'department_processor'
-    && !receiverAccepted
-    && (req.status === 'pending_approval' || req.status === 'processing'),
+    canReceiverHodAcceptNow(req),
   );
   const userAccepted = Boolean(userName && receiverAccepted === userName);
   const userApprovedStep = req.workflow.some(
@@ -85,6 +85,20 @@ function matchesVariant(
   );
 
   if (variant === 'approval') {
+    if (currentUser?.role === 'md') {
+      if (tab === 'pending') return isMdApprovalPending(req);
+      if (tab === 'approved') {
+        return req.workflow.some(
+          (s) => s.type === 'specific_role' && s.role === 'md' && s.completedBy === userName && s.status === 'approved',
+        );
+      }
+      if (tab === 'rejected') {
+        return req.workflow.some(
+          (s) => s.type === 'specific_role' && s.role === 'md' && s.completedBy === userName && s.status === 'rejected',
+        );
+      }
+      return Boolean(findMdApprovalStep(req.workflow));
+    }
     if (tab === 'pending') return isPendingApprovalStep;
     if (tab === 'approved') return userApprovedStep;
     if (tab === 'rejected') return userRejected;
@@ -433,15 +447,21 @@ function ApprovalCard({ req, tab, actionMode, onView, onAction, canAct }: {
 }
 
 function canActPending(req: Request, currentUser: Approver | null, variant: ApprovalsVariant) {
-  if (currentUser?.role === 'md') return false;
   const step = req.workflow[req.currentStep - 1];
   if (!step || step.status !== 'pending') return false;
+
   if (variant === 'approval') {
+    if (isMdRole(currentUser?.role)) {
+      return isMdApprovalPending(req);
+    }
     if (APPROVAL_STEP_TYPES.has(step.type)) return req.status === 'pending_approval';
     return false;
   }
+
+  if (isMdRole(currentUser?.role)) return false;
+
   if (step.type === 'department_processor' && !req.receiverApprovedBy && !req.receiverAcceptedBy) {
-    return req.status === 'pending_approval' || req.status === 'processing';
+    return canReceiverHodAcceptNow(req);
   }
   return false;
 }

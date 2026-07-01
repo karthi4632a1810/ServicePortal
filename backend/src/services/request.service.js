@@ -12,6 +12,7 @@ import formService from './form.service.js';
 import notificationService from './notification.service.js';
 import { mergeRequestScope, canAccessRequest, departmentsMatch } from '../utils/requestScope.js';
 import { isSuperAdmin, isHod, hasStaffAccess } from '../utils/roles.js';
+import { canReceiverHodAcceptNow } from '../utils/workflowHelpers.js';
 
 function mapRequestToFrontend(doc) {
   const r = doc.toObject ? doc.toObject() : doc;
@@ -229,9 +230,12 @@ export class RequestService {
       throw new AppError('This request is not awaiting department acceptance', 400);
     }
 
-    const requesterHodStep = request.workflow[0];
-    if (!requesterHodStep || requesterHodStep.status !== 'approved') {
-      throw new AppError('Requester department HOD must approve before department processing', 400);
+    if (!canReceiverHodAcceptNow(request)) {
+      const mdStep = request.workflow?.find((s) => s.type === 'specific_role' && s.role === 'md');
+      if (mdStep && mdStep.status !== 'approved') {
+        throw new AppError('Managing Director must approve this request before department acceptance', 400);
+      }
+      throw new AppError('All prior approval steps must be completed before department acceptance', 400);
     }
 
     if (request.receiverApprovedBy) {

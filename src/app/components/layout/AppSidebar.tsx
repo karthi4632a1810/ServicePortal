@@ -12,6 +12,7 @@ import { useApp } from '../../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 import { canAccessPage } from '../../utils/roleAccess';
 import { isPipelineRequest } from '../../utils/mapRequestToWorkflow';
+import { canReceiverHodAcceptNow, isMdApprovalPending } from '../../utils/workflowHelpers';
 import type { Page } from '../../types';
 
 interface NavItem {
@@ -67,15 +68,14 @@ function useNavBadges(
     approvals: requests.filter((r) => {
       const step = r.workflow[r.currentStep - 1];
       if (r.queueStatus === 'pending_hod_review') return false;
+      if (currentUser?.role === 'md') return isMdApprovalPending(r);
       return r.status === 'pending_approval'
         && step?.status === 'pending'
         && approvalSteps.has(step.type);
     }).length,
     accept: requests.filter((r) => {
-      const step = r.workflow[r.currentStep - 1];
-      return step?.type === 'department_processor'
-        && !(r.receiverAcceptedBy || r.receiverApprovedBy)
-        && r.status === 'processing'
+      if (currentUser?.role === 'md') return false;
+      return canReceiverHodAcceptNow(r)
         && currentUser?.role === 'hod'
         && departmentsMatch(currentUser.department, r.department);
     }).length,

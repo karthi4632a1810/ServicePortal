@@ -1,8 +1,9 @@
 import Request from '../models/Request.js';
 import workflowEngine from './workflowEngine.service.js';
 import hrmsService from './hrms.service.js';
-import { isSuperAdmin, isHod } from '../utils/roles.js';
+import { isSuperAdmin, isHod, isMd } from '../utils/roles.js';
 import { canAccessRequest, departmentsMatch, mergeRequestScope } from '../utils/requestScope.js';
+import { canReceiverHodAcceptNow, isMdApprovalPending } from '../utils/workflowHelpers.js';
 import { AppError } from '../utils/response.js';
 
 const APPROVAL_STEP_TYPES = new Set(['hod', 'reporting_manager', 'specific_user', 'specific_role', 'parallel']);
@@ -20,13 +21,17 @@ function isReceiverDeptHod(user, req) {
 function userCanApproveNow(user, req) {
   const step = req.workflow[req.currentStep - 1];
   if (!step || step.status !== 'pending') return false;
+
+  if (isMd(user.role)) {
+    return isMdApprovalPending(req);
+  }
+
   if (isApprovalStep(step)) {
     return workflowEngine.canUserActOnStep(user, step, req);
   }
-  // Receiving dept HOD accepts work after requester HOD approved step 1
+
   if (step.type === 'department_processor' && !req.receiverApprovedBy) {
-    const requesterHodStep = req.workflow[0];
-    if (!requesterHodStep || requesterHodStep.status !== 'approved') return false;
+    if (!canReceiverHodAcceptNow(req)) return false;
     return isReceiverDeptHod(user, req);
   }
   return false;
@@ -170,6 +175,13 @@ export class ApprovalService {
         throw new AppError('You are not authorized to forward this request', 403);
       }
     } else if (isReceiverAcceptPhase) {
+      if (!canReceiverHodAcceptNow(request) && !isSuperAdmin(user.role)) {
+        const mdStep = request.workflow?.find((s) => s.type === 'specific_role' && s.role === 'md');
+        if (mdStep && mdStep.status !== 'approved') {
+          throw new AppError('Managing Director must approve this request before department acceptance', 403);
+        }
+        throw new AppError('All prior approval steps must be completed before department acceptance', 403);
+      }
       if (!isReceiverDeptHod(user, request) && !isSuperAdmin(user.role)) {
         throw new AppError('Only the receiving department HOD can act on this request', 403);
       }

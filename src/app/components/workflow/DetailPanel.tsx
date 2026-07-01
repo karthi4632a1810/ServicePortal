@@ -113,6 +113,18 @@ function CommentBubble({ c }: { c: { author: string; role: string; initials: str
   );
 }
 
+function wfCanReceiverHodAccept(req: WFRequest) {
+  const active = req.steps[req.currentStep - 1];
+  if (active?.type !== 'department_processor') return false;
+  if (req.receiverAcceptedBy || req.receiverApprovedBy) return false;
+  const mdStep = req.steps.find((s) => s.type === 'specific_role' && s.role === 'md');
+  if (mdStep && mdStep.status !== 'done') return false;
+  for (let i = 0; i < req.currentStep - 1; i++) {
+    if (req.steps[i]?.status !== 'done') return false;
+  }
+  return true;
+}
+
 interface DetailPanelProps {
   request: WFRequest | null;
   onClose: () => void;
@@ -328,7 +340,7 @@ export function DetailPanel({
     && ['pending_approval', 'processing'].includes(request?.status || '');
   const receiverAccepted = request?.receiverAcceptedBy || request?.receiverApprovedBy;
   const needsReceiverAccept = Boolean(
-    isProcessorStep && !receiverAccepted && requesterHodApproved,
+    request && isProcessorStep && !receiverAccepted && wfCanReceiverHodAccept(request),
   );
   const canReceiverAccept = Boolean(
     needsReceiverAccept && currentUser && isReceiverDeptHod(currentUser, request) && !isMdRole(currentUser.role),
