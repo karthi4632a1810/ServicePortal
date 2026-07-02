@@ -122,9 +122,12 @@ function PipelineCard({
   const inProgress = req.queueStatus === 'in_progress';
   const awaitingStart = req.pipelineStatus === 'assigned' && req.queueStatus === 'pending';
 
+  const assigneeLabel = req.assignedTo
+    || req.assignees?.find((a) => a.status !== 'cancelled')?.name;
+
   return (
     <motion.div
-      variants={fadeUp}
+      initial={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
       onClick={onClick}
       className={cn(
@@ -134,7 +137,7 @@ function PipelineCard({
         awaitingConfirm
           ? 'bg-amber-50/90 dark:bg-amber-950/35 border-amber-300/80 dark:border-amber-700/60 ring-1 ring-amber-200/80 dark:ring-amber-800/50'
           : awaitingStart
-            ? 'bg-blue-50/70 dark:bg-blue-950/25 border-blue-200/70 dark:border-blue-800/50'
+            ? 'bg-card border-blue-300/80 dark:border-blue-700/50 ring-1 ring-blue-100/80 dark:ring-blue-900/40'
             : inProgress
               ? 'bg-purple-50/40 dark:bg-purple-950/20 border-purple-200/60 dark:border-purple-800/40'
               : 'bg-card border-border/70 hover:border-primary/25',
@@ -144,6 +147,16 @@ function PipelineCard({
         borderLeftColor: awaitingConfirm ? '#D97706' : awaitingStart ? '#2563EB' : inProgress ? '#7C3AED' : accent,
       }}
     >
+      {awaitingStart && assigneeLabel && (
+        <div className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/50 border-b border-blue-200/80 dark:border-blue-800/50 flex items-center gap-1.5">
+          <User className="size-3 text-blue-600 dark:text-blue-300 shrink-0" />
+          <span className="text-blue-800 dark:text-blue-200 truncate" style={{ fontSize: '10px', fontWeight: 700 }}>
+            Assigned to {assigneeLabel}
+            {req.assignedToEmployeeId ? ` (${req.assignedToEmployeeId})` : ''}
+          </span>
+        </div>
+      )}
+
       {awaitingConfirm && (
         <div className="px-3 py-1.5 bg-amber-100/90 dark:bg-amber-900/50 border-b border-amber-200/80 dark:border-amber-800/50 flex items-center gap-1.5">
           <motion.span
@@ -366,7 +379,7 @@ function PipelineColumn({
                 <p className="text-muted-foreground/60" style={{ fontSize: '10px' }}>All clear here</p>
               </motion.div>
             ) : (
-              <motion.div variants={stagger(0.05)} initial="hidden" animate="show" className="space-y-3">
+              <div className="space-y-3">
                 {sortedRequests.map((req) => (
                   <PipelineCard
                     key={req.id}
@@ -376,7 +389,7 @@ function PipelineColumn({
                     isSelected={selectedRequestId === req.id}
                   />
                 ))}
-              </motion.div>
+              </div>
             )}
           </motion.div>
         )}

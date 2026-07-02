@@ -7,7 +7,10 @@ export function MotionProvider({ children }: { children: React.ReactNode }) {
   const enabled = preferences.animations;
 
   return (
-    <MotionConfig reducedMotion={enabled ? 'never' : 'always'} transition={{ duration: 0 }}>
+    <MotionConfig
+      reducedMotion={enabled ? 'never' : 'always'}
+      transition={enabled ? undefined : { duration: 0 }}
+    >
       {children}
     </MotionConfig>
   );
