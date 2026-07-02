@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useRef, useEffect } from 'react';
+import React, { useState, useMemo, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence, useInView } from 'motion/react';
 import {
   Search, Filter, LayoutGrid, List, BarChart2, ChevronDown,
@@ -31,6 +31,7 @@ import { useApp } from '../context/AppContext';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
 import { requestsToWorkflow, mapRequestToWorkflow } from '../utils/mapRequestToWorkflow';
 import { api } from '../services/api';
+import { toast } from 'sonner';
 
 /* ── Icon map ────────────────────────────────────────────────── */
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -104,6 +105,24 @@ function staffInitials(name?: string) {
     .join('') || '??';
 }
 
+function getActiveAssignees(req: WFRequest) {
+  const fromList = req.assignees?.filter((a) => a.status !== 'cancelled') ?? [];
+  if (fromList.length) return fromList;
+  if (req.assignedTo || req.assignedToEmployeeId) {
+    return [{ employeeId: req.assignedToEmployeeId || '', name: req.assignedTo || 'Unknown', status: 'pending' }];
+  }
+  return [];
+}
+
+function formatAssigneeSummary(assignees: Array<{ employeeId: string; name: string }>) {
+  if (!assignees.length) return '';
+  const first = assignees[0];
+  const firstLabel = `${first.name}${first.employeeId ? ` (${first.employeeId})` : ''}`;
+  const extra = assignees.length - 1;
+  if (extra <= 0) return firstLabel;
+  return `${firstLabel} and ${extra} more ${extra === 1 ? 'person' : 'people'}`;
+}
+
 /* ── Pipeline Card ───────────────────────────────────────────── */
 function PipelineCard({
   req,
@@ -122,8 +141,11 @@ function PipelineCard({
   const inProgress = req.queueStatus === 'in_progress';
   const awaitingStart = req.pipelineStatus === 'assigned' && req.queueStatus === 'pending';
 
-  const assigneeLabel = req.assignedTo
-    || req.assignees?.find((a) => a.status !== 'cancelled')?.name;
+  const activeAssignees = getActiveAssignees(req);
+  const assigneeSummary = formatAssigneeSummary(activeAssignees);
+  const assigneeTooltip = activeAssignees
+    .map((a) => `${a.name}${a.employeeId ? ` (${a.employeeId})` : ''}`)
+    .join(', ');
 
   return (
     <motion.div
@@ -147,12 +169,14 @@ function PipelineCard({
         borderLeftColor: awaitingConfirm ? '#D97706' : awaitingStart ? '#2563EB' : inProgress ? '#7C3AED' : accent,
       }}
     >
-      {awaitingStart && assigneeLabel && (
-        <div className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/50 border-b border-blue-200/80 dark:border-blue-800/50 flex items-center gap-1.5">
+      {awaitingStart && assigneeSummary && (
+        <div
+          className="px-3 py-1.5 bg-blue-50 dark:bg-blue-950/50 border-b border-blue-200/80 dark:border-blue-800/50 flex items-center gap-1.5"
+          title={assigneeTooltip}
+        >
           <User className="size-3 text-blue-600 dark:text-blue-300 shrink-0" />
           <span className="text-blue-800 dark:text-blue-200 truncate" style={{ fontSize: '10px', fontWeight: 700 }}>
-            Assigned to {assigneeLabel}
-            {req.assignedToEmployeeId ? ` (${req.assignedToEmployeeId})` : ''}
+            Assigned to {assigneeSummary}
           </span>
         </div>
       )}
@@ -227,17 +251,40 @@ function PipelineCard({
             <p className="text-foreground truncate" style={{ fontSize: '11px', fontWeight: 500 }}>{req.employeeName}</p>
             <p className="text-muted-foreground truncate" style={{ fontSize: '10px' }}>{req.employeeDept}</p>
           </div>
-          {(req.assignedTo || req.assignees?.length) && (
-            <div className="flex items-center gap-1 shrink-0 pl-2 border-l border-border/50">
+          {activeAssignees.length > 0 && (
+            <div
+              className="flex items-center gap-1 shrink-0 pl-2 border-l border-border/50"
+              title={assigneeTooltip}
+            >
               <User className="size-3 text-muted-foreground" />
-              <div
-                className="size-6 rounded-full bg-background border border-border flex items-center justify-center"
-                title={req.assignedTo || req.assignees?.[0]?.name}
-              >
-                <span className="text-muted-foreground" style={{ fontSize: '8px', fontWeight: 700 }}>
-                  {req.assignedInitials || staffInitials(req.assignees?.[0]?.name)}
-                </span>
+              <div className="flex items-center -space-x-1">
+                {activeAssignees.slice(0, 2).map((a, i) => (
+                  <div
+                    key={a.employeeId || `${a.name}-${i}`}
+                    className="size-6 rounded-full bg-background border border-border flex items-center justify-center"
+                    style={{ zIndex: 2 - i }}
+                  >
+                    <span className="text-muted-foreground" style={{ fontSize: '8px', fontWeight: 700 }}>
+                      {staffInitials(a.name)}
+                    </span>
+                  </div>
+                ))}
+                {activeAssignees.length > 2 && (
+                  <div
+                    className="size-6 rounded-full bg-muted border border-border flex items-center justify-center"
+                    style={{ zIndex: 0 }}
+                  >
+                    <span className="text-muted-foreground" style={{ fontSize: '7px', fontWeight: 700 }}>
+                      +{activeAssignees.length - 2}
+                    </span>
+                  </div>
+                )}
               </div>
+              {activeAssignees.length > 2 && (
+                <span className="text-muted-foreground whitespace-nowrap" style={{ fontSize: '9px', fontWeight: 600 }}>
+                  +{activeAssignees.length - 2} more
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -634,7 +681,16 @@ const FILTERS: { id: FilterKey; label: string; dot?: string }[] = [
 
 /* ── Main page ───────────────────────────────────────────────── */
 export function WorkflowPipelinePage() {
-  const { requests, loading: appLoading, currentUser, chartData, performApprovalAction, refreshRequests, updateRequest } = useApp();
+  const {
+    requests,
+    loading: appLoading,
+    currentUser,
+    chartData,
+    performApprovalAction,
+    refreshRequests,
+    updateRequest,
+    loadDashboard,
+  } = useApp();
   const workflowRequests = useMemo(() => requestsToWorkflow(requests), [requests]);
   const [view, setView] = useState<'pipeline' | 'timeline' | 'analytics'>('pipeline');
   const [filter, setFilter] = useState<FilterKey>('all');
@@ -643,8 +699,36 @@ export function WorkflowPipelinePage() {
   const [selectedReq, setSelectedReq] = useState<WFRequest | null>(null);
   const [collapsed, setCollapsed] = useState<Set<WFPipelineStatus>>(new Set(['rejected']));
   const [showSearch, setShowSearch] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const refreshingRef = useRef(false);
+  const selectedReqIdRef = useRef<string | null>(null);
+  selectedReqIdRef.current = selectedReq?.id ?? null;
 
-  useScreenRefresh(refreshRequests);
+  const handleRefreshPage = useCallback(async () => {
+    if (refreshingRef.current) return;
+    refreshingRef.current = true;
+    setIsRefreshing(true);
+    try {
+      const openId = selectedReqIdRef.current;
+      await Promise.all([refreshRequests(), loadDashboard()]);
+      if (openId) {
+        try {
+          const res = await api.getRequest(openId);
+          updateRequest(res.data);
+          setSelectedReq(mapRequestToWorkflow(res.data, 0));
+        } catch (err) {
+          toast.error(err instanceof Error ? err.message : 'Could not refresh request details');
+        }
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to refresh pipeline');
+    } finally {
+      refreshingRef.current = false;
+      setIsRefreshing(false);
+    }
+  }, [refreshRequests, loadDashboard, updateRequest]);
+
+  useScreenRefresh(handleRefreshPage);
 
   const isLoading = appLoading;
   const isSuperAdmin = currentUser?.role === 'super_admin';
@@ -755,11 +839,20 @@ export function WorkflowPipelinePage() {
             </AnimatePresence>
 
             <motion.button
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              onClick={() => void refreshRequests()}
-              className="size-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              type="button"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => void handleRefreshPage()}
+              disabled={isRefreshing}
+              title="Refresh pipeline"
+              className="size-8 flex items-center justify-center rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50"
             >
-              <RefreshCw className="size-4" />
+              <motion.div
+                animate={isRefreshing ? { rotate: 360 } : {}}
+                transition={{ duration: 0.8, repeat: isRefreshing ? Infinity : 0, ease: 'linear' }}
+              >
+                <RefreshCw className="size-4" />
+              </motion.div>
             </motion.button>
 
             <motion.button
