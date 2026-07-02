@@ -2,7 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Loader2, AlertCircle } from 'lucide-react';
 import * as pdfjs from 'pdfjs-dist';
 
-pdfjs.GlobalWorkerOptions.workerSrc = `${import.meta.env.BASE_URL}pdf.worker.min.mjs`;
+// Production: CDN worker (avoids nginx / PWA path issues). Dev: local public file.
+pdfjs.GlobalWorkerOptions.workerSrc = import.meta.env.PROD
+  ? `https://cdn.jsdelivr.net/npm/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`
+  : `${import.meta.env.BASE_URL}pdf.worker.min.mjs`;
 
 const BASE_SCALE = 1.35;
 

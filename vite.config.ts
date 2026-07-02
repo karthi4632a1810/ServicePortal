@@ -24,7 +24,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['paperZeroLogo.png', 'PaperZeroOutlineIcon.png'],
+      includeAssets: ['paperZeroLogo.png', 'PaperZeroOutlineIcon.png', 'pdf.worker.min.mjs'],
       manifest: {
         name: 'PaperZero',
         short_name: 'PaperZero',

@@ -36,7 +36,9 @@ const limiter = rateLimit({
   max: config.nodeEnv === 'production' ? 800 : 2000,
   standardHeaders: true,
   legacyHeaders: false,
-  skip: (req) => req.path === '/health' || req.originalUrl.startsWith('/api/health'),
+  skip: (req) => req.path === '/health'
+    || req.originalUrl.startsWith('/api/health')
+    || req.originalUrl.startsWith('/api/uploads/'),
   handler: (_req, res) => {
     res.status(429).json({
       success: false,
@@ -47,6 +49,7 @@ const limiter = rateLimit({
 app.use('/api/', limiter);
 
 app.use('/uploads', express.static(config.paths.uploads));
+app.use('/api/uploads', express.static(config.paths.uploads));
 
 app.get('/api/health', (_req, res) => {
   res.json({ success: true, message: 'Service Portal API is running', data: { env: config.nodeEnv } });

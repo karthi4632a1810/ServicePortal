@@ -3,9 +3,13 @@ import type { Attachment } from '../types';
 export type AttachmentKind = 'pdf' | 'image' | 'video' | 'csv' | 'excel' | 'unknown';
 
 export function resolveAttachmentUrl(att: Attachment): string {
-  if (att.url) return att.url;
-  if (att.path) return `/uploads/${String(att.path).replace(/\\/g, '/')}`;
-  return '';
+  const raw = att.url
+    || (att.path ? `/uploads/${String(att.path).replace(/\\/g, '/')}` : '');
+  if (!raw) return '';
+  // Route through /api so nginx always proxies to the backend file store
+  if (raw.startsWith('/uploads/')) return `/api${raw}`;
+  if (raw.startsWith('/api/uploads/')) return raw;
+  return raw;
 }
 
 export function getAttachmentKind(att: Attachment): AttachmentKind {

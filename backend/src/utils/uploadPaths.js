@@ -37,5 +37,5 @@ export function toRelativeUploadPath(absolutePath) {
 
 export function toPublicUploadUrl(relativePath) {
   if (!relativePath) return null;
-  return `/uploads/${relativePath.replace(/\\/g, '/')}`;
+  return `/api/uploads/${relativePath.replace(/\\/g, '/')}`;
 }

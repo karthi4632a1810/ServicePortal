@@ -39,7 +39,7 @@ function mapRequestToFrontend(doc) {
     })),
     attachments: (r.attachments || []).map((a) => ({
       ...a,
-      url: a.path ? `/uploads/${String(a.path).replace(/\\/g, '/')}` : undefined,
+      url: a.path ? `/api/uploads/${String(a.path).replace(/\\/g, '/')}` : undefined,
       uploadedAt: a.uploadedAt?.toISOString?.() || a.uploadedAt,
     })),
     priority: r.priority,
