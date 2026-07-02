@@ -8,8 +8,12 @@ import { getDefaultPage, DEMO_ACCOUNTS, hasAdminAccess, isEmployeeSession as isE
 import {
   DEFAULT_PREFERENCES,
   applyUserPreferences,
+  applyThemeAppearance,
+  normalizeUserPreferences,
+  resolveTheme,
   type UserPreferences,
   type ThemePreference,
+  type ThemeAppearance,
 } from '../utils/userPreferences';
 import {
   DEFAULT_NOTIFICATION_PREFERENCES,
@@ -391,9 +395,24 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
 
   const applyPreferences = useCallback((prefs: UserPreferences) => {
-    const effective = applyUserPreferences(prefs);
-    setPreferences(prefs);
+    const normalized = normalizeUserPreferences(prefs);
+    const effective = applyUserPreferences(normalized);
+    setPreferences(normalized);
     setIsDark(effective === 'dark');
+  }, []);
+
+  const mergePreferences = useCallback((base: UserPreferences, patch: Partial<UserPreferences>): UserPreferences => {
+    const normalized = normalizeUserPreferences(base);
+    return normalizeUserPreferences({
+      ...normalized,
+      ...patch,
+      appearanceLight: patch.appearanceLight
+        ? { ...normalized.appearanceLight, ...patch.appearanceLight }
+        : normalized.appearanceLight,
+      appearanceDark: patch.appearanceDark
+        ? { ...normalized.appearanceDark, ...patch.appearanceDark }
+        : normalized.appearanceDark,
+    });
   }, []);
 
   useEffect(() => {
@@ -463,21 +482,23 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const updatePreferences = useCallback(async (patch: Partial<UserPreferences>) => {
     const previous = preferences;
-    const next = { ...preferences, ...patch };
+    const next = mergePreferences(preferences, patch);
     applyPreferences(next);
 
     if (isAuthenticated) {
       try {
         const res = await api.updatePreferences(patch);
-        const merged = { ...DEFAULT_PREFERENCES, ...res.data };
+        const merged = normalizeUserPreferences({ ...DEFAULT_PREFERENCES, ...res.data });
         setPreferences(merged);
         applyPreferences(merged);
       } catch {
         applyPreferences(previous);
         throw new Error('Failed to save preferences');
       }
+    } else {
+      setPreferences(next);
     }
-  }, [preferences, applyPreferences, isAuthenticated]);
+  }, [preferences, applyPreferences, mergePreferences, isAuthenticated]);
 
   const updateNotificationPreferences = useCallback(async (patch: Partial<NotificationPreferences>) => {
     if (!currentUser) return;

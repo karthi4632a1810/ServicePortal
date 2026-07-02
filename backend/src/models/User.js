@@ -35,9 +35,22 @@ const userSchema = new mongoose.Schema(
     },
     preferences: {
       theme: { type: String, enum: ['light', 'dark', 'system'], default: 'light' },
+      appearanceLight: {
+        accentColor: { type: String, default: '#2563EB' },
+        sidebarColor: { type: String, default: null },
+        backgroundColor: { type: String, default: null },
+        surfaceColor: { type: String, default: null },
+      },
+      appearanceDark: {
+        accentColor: { type: String, default: '#3B82F6' },
+        sidebarColor: { type: String, default: null },
+        backgroundColor: { type: String, default: null },
+        surfaceColor: { type: String, default: null },
+      },
       accentColor: { type: String, default: '#2563EB' },
       sidebarColor: { type: String, default: null },
       backgroundColor: { type: String, default: null },
+      surfaceColor: { type: String, default: null },
       compactMode: { type: Boolean, default: false },
       animations: { type: Boolean, default: true },
     },

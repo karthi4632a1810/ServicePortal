@@ -3,13 +3,28 @@ import { motion } from 'motion/react';
 import { useNavigate } from 'react-router';
 import {
   Settings, User, Bell, Shield, Mail, Palette, Building2,
-  Globe, Key, Save, ChevronRight, Check, Smartphone,
+  Globe, Key, Save, ChevronRight, Check, Smartphone, RotateCcw, Sun, Moon,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../components/ui/card';
 import { cn } from '../components/ui/utils';
 import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
 import { isFixedSuperAdmin, getRoleLabel } from '../utils/roleAccess';
-import { ACCENT_COLORS, BACKGROUND_COLORS, SIDEBAR_COLORS } from '../utils/userPreferences';
+import {
+  ACCENT_COLORS,
+  applyThemeAppearance,
+  applyUserPreferences,
+  DARK_BACKGROUND_COLORS,
+  DARK_SURFACE_COLORS,
+  DEFAULT_APPEARANCE_RESET,
+  DEFAULT_DARK_APPEARANCE,
+  DEFAULT_LIGHT_APPEARANCE,
+  isDefaultAppearance,
+  LIGHT_BACKGROUND_COLORS,
+  LIGHT_SURFACE_COLORS,
+  resolveTheme,
+  SIDEBAR_COLORS,
+  type ThemeAppearance,
+} from '../utils/userPreferences';
 import { PaperZeroLogo } from '../components/branding/PaperZeroLogo';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../utils/notificationPreferences';
 import type { NotificationPreferences } from '../utils/notificationPreferences';
@@ -133,6 +148,111 @@ function ColorPickerRow({
   );
 }
 
+function AppearanceColorsEditor({
+  mode,
+  appearance,
+  defaults,
+  onPatch,
+}: {
+  mode: 'light' | 'dark';
+  appearance: ThemeAppearance;
+  defaults: ThemeAppearance;
+  onPatch: (patch: Partial<ThemeAppearance>) => void;
+}) {
+  const bgPresets = mode === 'light' ? LIGHT_BACKGROUND_COLORS : DARK_BACKGROUND_COLORS;
+  const surfacePresets = mode === 'light' ? LIGHT_SURFACE_COLORS : DARK_SURFACE_COLORS;
+  const panelHint = mode === 'dark' ? 'Cards, panels, and content areas (default: #131929)' : 'Cards, panels, and content areas';
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <div className="flex items-center justify-between gap-3 mb-1">
+          <p className="text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
+          {appearance.accentColor.toUpperCase() !== defaults.accentColor.toUpperCase() && (
+            <button
+              type="button"
+              onClick={() => onPatch({ accentColor: defaults.accentColor })}
+              className="text-primary hover:text-primary/80 transition-colors"
+              style={{ fontSize: '11px', fontWeight: 600 }}
+            >
+              Use default
+            </button>
+          )}
+        </div>
+        <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
+          Buttons, links, logo background, and favicon ({mode} theme)
+        </p>
+        <div className="flex gap-3 items-center flex-wrap">
+          {ACCENT_COLORS.map(({ color, label }) => (
+            <button
+              key={color}
+              type="button"
+              title={label}
+              onClick={() => onPatch({ accentColor: color })}
+              className={cn(
+                'size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform',
+                appearance.accentColor === color ? 'border-foreground scale-110' : 'border-white',
+              )}
+              style={{ background: color }}
+            />
+          ))}
+          <label
+            title="Custom accent color"
+            className={cn(
+              'relative size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform overflow-hidden cursor-pointer',
+              !ACCENT_COLORS.some((p) => p.color === appearance.accentColor)
+                ? 'border-foreground scale-110'
+                : 'border-border',
+            )}
+            style={{
+              background: `conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)`,
+            }}
+          >
+            <input
+              type="color"
+              value={appearance.accentColor}
+              onChange={(e) => onPatch({ accentColor: e.target.value })}
+              className="absolute inset-0 opacity-0 cursor-pointer"
+              aria-label={`Custom ${mode} accent color`}
+            />
+          </label>
+          <div className="ml-2 pl-3 border-l border-border flex items-center gap-2">
+            <PaperZeroLogo size={36} rounded="lg" />
+            <span className="text-muted-foreground" style={{ fontSize: '11px' }}>Logo preview</span>
+          </div>
+        </div>
+      </div>
+
+      <ColorPickerRow
+        label="SIDE MENU COLOR"
+        desc="Left navigation panel background"
+        value={appearance.sidebarColor}
+        presets={SIDEBAR_COLORS}
+        onChange={(sidebarColor) => onPatch({ sidebarColor })}
+        onReset={() => onPatch({ sidebarColor: null })}
+      />
+
+      <ColorPickerRow
+        label="BACKGROUND COLOR"
+        desc="Main page background behind content"
+        value={appearance.backgroundColor}
+        presets={bgPresets}
+        onChange={(backgroundColor) => onPatch({ backgroundColor })}
+        onReset={() => onPatch({ backgroundColor: null })}
+      />
+
+      <ColorPickerRow
+        label="PANEL COLOR"
+        desc={panelHint}
+        value={appearance.surfaceColor}
+        presets={surfacePresets}
+        onChange={(surfaceColor) => onPatch({ surfaceColor })}
+        onReset={() => onPatch({ surfaceColor: null })}
+      />
+    </div>
+  );
+}
+
 export function SettingsPage() {
   const {
     currentUser, preferences, setTheme, updatePreferences, updateNotificationPreferences, isAuthenticated,
@@ -162,6 +282,9 @@ export function SettingsPage() {
   const [orgError, setOrgError] = useState('');
   const [orgSaved, setOrgSaved] = useState(false);
   const [notifError, setNotifError] = useState('');
+  const [appearanceError, setAppearanceError] = useState('');
+  const [appearanceResetting, setAppearanceResetting] = useState(false);
+  const [appearanceTab, setAppearanceTab] = useState<'light' | 'dark'>('light');
 
   const user = currentUser ?? apiLoginUsers[0];
   const notificationPrefs = currentUser?.notificationPreferences ?? DEFAULT_NOTIFICATION_PREFERENCES;
@@ -174,6 +297,41 @@ export function SettingsPage() {
     } catch (err) {
       setNotifError(err instanceof Error ? err.message : 'Failed to save notification preferences');
     }
+  };
+
+  const handleResetAppearance = async () => {
+    setAppearanceError('');
+    setAppearanceResetting(true);
+    try {
+      await updatePreferences(DEFAULT_APPEARANCE_RESET);
+    } catch (err) {
+      setAppearanceError(err instanceof Error ? err.message : 'Failed to reset appearance');
+    } finally {
+      setAppearanceResetting(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeSection === 'appearance') {
+      setAppearanceTab(resolveTheme(preferences.theme) === 'dark' ? 'dark' : 'light');
+    }
+  }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== 'appearance') return;
+    const isDark = appearanceTab === 'dark';
+    document.documentElement.classList.toggle('dark', isDark);
+    const appearance = isDark ? preferences.appearanceDark : preferences.appearanceLight;
+    applyThemeAppearance(appearance, isDark);
+    return () => {
+      applyUserPreferences(preferences);
+    };
+  }, [activeSection, appearanceTab, preferences]);
+
+  const patchAppearance = (mode: 'light' | 'dark', patch: Partial<ThemeAppearance>) => {
+    const key = mode === 'light' ? 'appearanceLight' : 'appearanceDark';
+    const current = mode === 'light' ? preferences.appearanceLight : preferences.appearanceDark;
+    void updatePreferences({ [key]: { ...current, ...patch } });
   };
   const superAdminLocked = isFixedSuperAdmin(user);
   const canEditOrganization = user.role === 'super_admin' || user.role === 'admin';
@@ -560,10 +718,27 @@ export function SettingsPage() {
             <motion.div initial={{ opacity: 0, x: 8 }} animate={{ opacity: 1, x: 0 }}>
               <Card className="border-border/60 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Appearance</CardTitle>
-                  <CardDescription>Customize how the portal looks for you</CardDescription>
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <CardTitle>Appearance</CardTitle>
+                      <CardDescription>Customize how the portal looks for you</CardDescription>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={appearanceResetting || isDefaultAppearance(preferences)}
+                      onClick={() => void handleResetAppearance()}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-50 disabled:pointer-events-none shrink-0"
+                      style={{ fontSize: '12px', fontWeight: 600 }}
+                    >
+                      <RotateCcw className={cn('size-3.5', appearanceResetting && 'animate-spin')} />
+                      Reset to default
+                    </button>
+                  </div>
                 </CardHeader>
                 <CardContent className="space-y-6">
+                  {appearanceError && (
+                    <p className="text-destructive" style={{ fontSize: '12px' }}>{appearanceError}</p>
+                  )}
                   <div>
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 600 }}>THEME</p>
                     <div className="flex gap-3">
@@ -591,68 +766,42 @@ export function SettingsPage() {
                   </div>
 
                   <div>
-                    <p className="text-muted-foreground mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
-                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
-                      Buttons, links, logo background, and favicon
+                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 600 }}>
+                      COLORS BY THEME
                     </p>
-                    <div className="flex gap-3 items-center flex-wrap">
-                      {ACCENT_COLORS.map(({ color, label }) => (
+                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
+                      Light and dark each have their own colors. Changing one does not affect the other.
+                    </p>
+                    <div className="inline-flex p-1 rounded-xl bg-muted/60 border border-border/60 mb-4">
+                      {([
+                        { id: 'light' as const, label: 'Light theme', icon: Sun },
+                        { id: 'dark' as const, label: 'Dark theme', icon: Moon },
+                      ]).map(({ id, label, icon: Icon }) => (
                         <button
-                          key={color}
+                          key={id}
                           type="button"
-                          title={label}
-                          onClick={() => void updatePreferences({ accentColor: color })}
+                          onClick={() => setAppearanceTab(id)}
                           className={cn(
-                            'size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform',
-                            preferences.accentColor === color ? 'border-foreground scale-110' : 'border-white',
+                            'inline-flex items-center gap-2 px-4 py-2 rounded-lg transition-colors',
+                            appearanceTab === id
+                              ? 'bg-card text-foreground shadow-sm'
+                              : 'text-muted-foreground hover:text-foreground',
                           )}
-                          style={{ background: color }}
-                        />
+                          style={{ fontSize: '12px', fontWeight: 600 }}
+                        >
+                          <Icon className="size-4" />
+                          {label}
+                        </button>
                       ))}
-                      <label
-                        title="Custom accent color"
-                        className={cn(
-                          'relative size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform overflow-hidden cursor-pointer',
-                          !ACCENT_COLORS.some((p) => p.color === preferences.accentColor)
-                            ? 'border-foreground scale-110'
-                            : 'border-border',
-                        )}
-                        style={{
-                          background: `conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)`,
-                        }}
-                      >
-                        <input
-                          type="color"
-                          value={preferences.accentColor}
-                          onChange={(e) => void updatePreferences({ accentColor: e.target.value })}
-                          className="absolute inset-0 opacity-0 cursor-pointer"
-                          aria-label="Custom accent color"
-                        />
-                      </label>
-                      <div className="ml-2 pl-3 border-l border-border flex items-center gap-2">
-                        <PaperZeroLogo size={36} rounded="lg" />
-                        <span className="text-muted-foreground" style={{ fontSize: '11px' }}>Logo preview</span>
-                      </div>
                     </div>
+
+                    <AppearanceColorsEditor
+                      mode={appearanceTab}
+                      appearance={appearanceTab === 'light' ? preferences.appearanceLight : preferences.appearanceDark}
+                      defaults={appearanceTab === 'light' ? DEFAULT_LIGHT_APPEARANCE : DEFAULT_DARK_APPEARANCE}
+                      onPatch={(patch) => patchAppearance(appearanceTab, patch)}
+                    />
                   </div>
-
-                  <ColorPickerRow
-                    label="SIDE MENU COLOR"
-                    desc="Left navigation panel background"
-                    value={preferences.sidebarColor}
-                    presets={SIDEBAR_COLORS}
-                    onChange={(sidebarColor) => void updatePreferences({ sidebarColor })}
-                    onReset={() => void updatePreferences({ sidebarColor: null })}
-                  />
-
-                  <ColorPickerRow
-                    label="BACKGROUND COLOR"
-                    desc="Main page background behind content"
-                    value={preferences.backgroundColor}
-                    presets={BACKGROUND_COLORS}
-                    onChange={(backgroundColor) => void updatePreferences({ backgroundColor })}
-                    onReset={() => void updatePreferences({ backgroundColor: null })}
-                  />
 
                   <ToggleSetting
                     label="Compact Mode"

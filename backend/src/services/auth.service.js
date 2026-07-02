@@ -66,11 +66,45 @@ export class AuthService {
 
   formatPreferences(user) {
     const prefs = user.preferences || {};
+    const defaultLight = {
+      accentColor: '#2563EB',
+      sidebarColor: null,
+      backgroundColor: null,
+      surfaceColor: null,
+    };
+    const defaultDark = {
+      accentColor: '#3B82F6',
+      sidebarColor: null,
+      backgroundColor: null,
+      surfaceColor: null,
+    };
+
+    const formatAppearance = (obj, defaults) => ({
+      accentColor: obj?.accentColor || defaults.accentColor,
+      sidebarColor: obj?.sidebarColor ?? null,
+      backgroundColor: obj?.backgroundColor ?? null,
+      surfaceColor: obj?.surfaceColor ?? null,
+    });
+
+    if (prefs.appearanceLight || prefs.appearanceDark) {
+      return {
+        theme: prefs.theme || 'light',
+        appearanceLight: formatAppearance(prefs.appearanceLight, defaultLight),
+        appearanceDark: formatAppearance(prefs.appearanceDark, defaultDark),
+        compactMode: prefs.compactMode ?? false,
+        animations: prefs.animations ?? true,
+      };
+    }
+
     return {
       theme: prefs.theme || 'light',
-      accentColor: prefs.accentColor || '#2563EB',
-      sidebarColor: prefs.sidebarColor ?? null,
-      backgroundColor: prefs.backgroundColor ?? null,
+      appearanceLight: {
+        accentColor: prefs.accentColor || defaultLight.accentColor,
+        sidebarColor: prefs.sidebarColor ?? null,
+        backgroundColor: prefs.backgroundColor ?? null,
+        surfaceColor: prefs.surfaceColor ?? null,
+      },
+      appearanceDark: { ...defaultDark },
       compactMode: prefs.compactMode ?? false,
       animations: prefs.animations ?? true,
     };
@@ -134,18 +168,28 @@ export class AuthService {
   }
 
   async updatePreferences(userId, patch) {
-    const allowed = ['theme', 'accentColor', 'sidebarColor', 'backgroundColor', 'compactMode', 'animations'];
-    const update = {};
-    for (const key of allowed) {
-      if (patch[key] !== undefined) update[`preferences.${key}`] = patch[key];
-    }
-    if (!Object.keys(update).length) {
-      throw new AppError('No valid preferences provided', 400);
-    }
-
-    const user = await User.findByIdAndUpdate(userId, { $set: update }, { new: true });
+    const user = await User.findById(userId);
     if (!user) throw new AppError('User not found', 404);
-    return this.formatPreferences(user);
+
+    const current = this.formatPreferences(user);
+    const next = {
+      ...current,
+      ...patch,
+      appearanceLight: patch.appearanceLight
+        ? { ...current.appearanceLight, ...patch.appearanceLight }
+        : current.appearanceLight,
+      appearanceDark: patch.appearanceDark
+        ? { ...current.appearanceDark, ...patch.appearanceDark }
+        : current.appearanceDark,
+    };
+
+    const updated = await User.findByIdAndUpdate(
+      userId,
+      { $set: { preferences: next } },
+      { new: true },
+    );
+    if (!updated) throw new AppError('User not found', 404);
+    return this.formatPreferences(updated);
   }
 
   async enrichFromHrms(user) {
