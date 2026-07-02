@@ -69,6 +69,8 @@ export class AuthService {
     return {
       theme: prefs.theme || 'light',
       accentColor: prefs.accentColor || '#2563EB',
+      sidebarColor: prefs.sidebarColor ?? null,
+      backgroundColor: prefs.backgroundColor ?? null,
       compactMode: prefs.compactMode ?? false,
       animations: prefs.animations ?? true,
     };
@@ -132,7 +134,7 @@ export class AuthService {
   }
 
   async updatePreferences(userId, patch) {
-    const allowed = ['theme', 'accentColor', 'compactMode', 'animations'];
+    const allowed = ['theme', 'accentColor', 'sidebarColor', 'backgroundColor', 'compactMode', 'animations'];
     const update = {};
     for (const key of allowed) {
       if (patch[key] !== undefined) update[`preferences.${key}`] = patch[key];

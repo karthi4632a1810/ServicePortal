@@ -80,10 +80,14 @@ const importUsersSchema = z.object({
   }),
 });
 
+const hexColor = z.string().regex(/^#[0-9A-Fa-f]{6}$/);
+
 const preferencesSchema = z.object({
   body: z.object({
     theme: z.enum(['light', 'dark', 'system']).optional(),
-    accentColor: z.string().regex(/^#[0-9A-Fa-f]{6}$/).optional(),
+    accentColor: hexColor.optional(),
+    sidebarColor: z.union([hexColor, z.null()]).optional(),
+    backgroundColor: z.union([hexColor, z.null()]).optional(),
     compactMode: z.boolean().optional(),
     animations: z.boolean().optional(),
   }),

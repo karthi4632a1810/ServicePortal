@@ -414,7 +414,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
             setCurrentUser(me.data);
             setIsAuthenticated(true);
             setCurrentPage(getDefaultPage(me.data.role));
-            applyPreferences(me.data.preferences ?? DEFAULT_PREFERENCES);
+            applyPreferences({ ...DEFAULT_PREFERENCES, ...me.data.preferences });
 
             void refreshForms().catch((err) => {
               console.warn('Forms load failed:', err);
@@ -469,8 +469,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     if (isAuthenticated) {
       try {
         const res = await api.updatePreferences(patch);
-        setPreferences(res.data);
-        applyPreferences(res.data);
+        const merged = { ...DEFAULT_PREFERENCES, ...res.data };
+        setPreferences(merged);
+        applyPreferences(merged);
       } catch {
         applyPreferences(previous);
         throw new Error('Failed to save preferences');
@@ -507,7 +508,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setCurrentPage(getDefaultPage(user.role));
-    applyPreferences(user.preferences ?? DEFAULT_PREFERENCES);
+    applyPreferences({ ...DEFAULT_PREFERENCES, ...user.preferences });
 
     void refreshForms();
     if (user.role === 'employee' && user.employeeId) {
@@ -526,7 +527,7 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setCurrentUser(user);
     setIsAuthenticated(true);
     setCurrentPage(getDefaultPage(user.role));
-    applyPreferences(user.preferences ?? DEFAULT_PREFERENCES);
+    applyPreferences({ ...DEFAULT_PREFERENCES, ...user.preferences });
 
     void refreshForms();
     if (user.role === 'employee' && user.employeeId) {

@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../co
 import { cn } from '../components/ui/utils';
 import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
 import { isFixedSuperAdmin, getRoleLabel } from '../utils/roleAccess';
-import { ACCENT_COLORS } from '../utils/userPreferences';
+import { ACCENT_COLORS, BACKGROUND_COLORS, SIDEBAR_COLORS } from '../utils/userPreferences';
 import { PaperZeroLogo } from '../components/branding/PaperZeroLogo';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../utils/notificationPreferences';
 import type { NotificationPreferences } from '../utils/notificationPreferences';
@@ -58,6 +58,77 @@ function ToggleSetting({
           className="absolute top-1 size-4 rounded-full bg-white shadow-sm"
         />
       </button>
+    </div>
+  );
+}
+
+function ColorPickerRow({
+  label,
+  desc,
+  value,
+  presets,
+  onChange,
+  onReset,
+}: {
+  label: string;
+  desc: string;
+  value: string | null;
+  presets: ReadonlyArray<{ color: string; label: string }>;
+  onChange: (color: string) => void;
+  onReset: () => void;
+}) {
+  const presetColors = presets.map((p) => p.color);
+  const pickerValue = value && /^#[0-9A-Fa-f]{6}$/.test(value) ? value : presets[0].color;
+
+  return (
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-1">
+        <p className="text-muted-foreground" style={{ fontSize: '11px', fontWeight: 600 }}>{label}</p>
+        {value && (
+          <button
+            type="button"
+            onClick={onReset}
+            className="text-primary hover:text-primary/80 transition-colors"
+            style={{ fontSize: '11px', fontWeight: 600 }}
+          >
+            Use default
+          </button>
+        )}
+      </div>
+      <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>{desc}</p>
+      <div className="flex gap-3 items-center flex-wrap">
+        {presets.map(({ color, label: presetLabel }) => (
+          <button
+            key={color}
+            type="button"
+            title={presetLabel}
+            onClick={() => onChange(color)}
+            className={cn(
+              'size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform',
+              value === color ? 'border-foreground scale-110' : 'border-white',
+            )}
+            style={{ background: color }}
+          />
+        ))}
+        <label
+          title="Custom color"
+          className={cn(
+            'relative size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform overflow-hidden cursor-pointer',
+            value && !presetColors.includes(value) ? 'border-foreground scale-110' : 'border-border',
+          )}
+          style={{
+            background: `conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)`,
+          }}
+        >
+          <input
+            type="color"
+            value={pickerValue}
+            onChange={(e) => onChange(e.target.value)}
+            className="absolute inset-0 opacity-0 cursor-pointer"
+            aria-label={`${label} custom color`}
+          />
+        </label>
+      </div>
     </div>
   );
 }
@@ -522,12 +593,13 @@ export function SettingsPage() {
                   <div>
                     <p className="text-muted-foreground mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
                     <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
-                      Buttons, links, and logo background
+                      Buttons, links, logo background, and favicon
                     </p>
                     <div className="flex gap-3 items-center flex-wrap">
                       {ACCENT_COLORS.map(({ color, label }) => (
                         <button
                           key={color}
+                          type="button"
                           title={label}
                           onClick={() => void updatePreferences({ accentColor: color })}
                           className={cn(
@@ -537,12 +609,50 @@ export function SettingsPage() {
                           style={{ background: color }}
                         />
                       ))}
+                      <label
+                        title="Custom accent color"
+                        className={cn(
+                          'relative size-8 rounded-full border-2 shadow-sm hover:scale-110 transition-transform overflow-hidden cursor-pointer',
+                          !ACCENT_COLORS.some((p) => p.color === preferences.accentColor)
+                            ? 'border-foreground scale-110'
+                            : 'border-border',
+                        )}
+                        style={{
+                          background: `conic-gradient(from 0deg, #ef4444, #f59e0b, #22c55e, #3b82f6, #a855f7, #ef4444)`,
+                        }}
+                      >
+                        <input
+                          type="color"
+                          value={preferences.accentColor}
+                          onChange={(e) => void updatePreferences({ accentColor: e.target.value })}
+                          className="absolute inset-0 opacity-0 cursor-pointer"
+                          aria-label="Custom accent color"
+                        />
+                      </label>
                       <div className="ml-2 pl-3 border-l border-border flex items-center gap-2">
                         <PaperZeroLogo size={36} rounded="lg" />
                         <span className="text-muted-foreground" style={{ fontSize: '11px' }}>Logo preview</span>
                       </div>
                     </div>
                   </div>
+
+                  <ColorPickerRow
+                    label="SIDE MENU COLOR"
+                    desc="Left navigation panel background"
+                    value={preferences.sidebarColor}
+                    presets={SIDEBAR_COLORS}
+                    onChange={(sidebarColor) => void updatePreferences({ sidebarColor })}
+                    onReset={() => void updatePreferences({ sidebarColor: null })}
+                  />
+
+                  <ColorPickerRow
+                    label="BACKGROUND COLOR"
+                    desc="Main page background behind content"
+                    value={preferences.backgroundColor}
+                    presets={BACKGROUND_COLORS}
+                    onChange={(backgroundColor) => void updatePreferences({ backgroundColor })}
+                    onReset={() => void updatePreferences({ backgroundColor: null })}
+                  />
 
                   <ToggleSetting
                     label="Compact Mode"
