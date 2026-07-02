@@ -18,40 +18,26 @@ export function PaperZeroLogo({
   const radius =
     rounded === 'none' ? '' : rounded === 'xl' ? 'rounded-xl' : rounded === 'lg' ? 'rounded-lg' : 'rounded-md';
 
-  const img = (
-    <img
-      src={LOGO_OUTLINE_URL}
-      alt="PaperZero"
-      className="w-full h-full object-contain"
-      draggable={false}
-    />
-  );
-
-  if (!withBackground) {
-    return (
-      <div className={cn('shrink-0 overflow-hidden', radius, className)} style={{ width: size, height: size }}>
-        {img}
-      </div>
-    );
-  }
-
   return (
     <div
       className={cn(
-        'flex items-center justify-center bg-primary shrink-0 overflow-hidden shadow-sm',
+        'flex items-center justify-center shrink-0 overflow-hidden',
+        withBackground ? 'bg-primary shadow-sm' : '',
         radius,
         className,
       )}
-      style={{
-        width: size,
-        height: size,
-        padding: Math.max(2, Math.round(size * 0.14)),
-      }}
+      style={{ width: size, height: size }}
       title="PaperZero"
     >
-      <div className={cn('w-full h-full overflow-hidden bg-black/95 flex items-center justify-center', radius)}>
-        {img}
-      </div>
+      <img
+        src={LOGO_OUTLINE_URL}
+        alt="PaperZero"
+        className={cn(
+          'object-contain',
+          withBackground ? 'size-[72%] mix-blend-lighten' : 'w-full h-full',
+        )}
+        draggable={false}
+      />
     </div>
   );
 }
