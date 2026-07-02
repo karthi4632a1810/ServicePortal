@@ -2,14 +2,34 @@ import type { Attachment } from '../types';
 
 export type AttachmentKind = 'pdf' | 'image' | 'video' | 'csv' | 'excel' | 'unknown';
 
+function relativeFromAttachment(att: Attachment): string {
+  const raw = att.url || '';
+  if (raw) {
+    return raw
+      .replace(/^\/+/, '')
+      .replace(/^api\/uploads\//i, '')
+      .replace(/^uploads\/+/i, '')
+      .replace(/^uploads_data\/+/i, '')
+      .replace(/^\/api\/uploads\//i, '')
+      .replace(/^\/uploads\//i, '')
+      .replace(/^\/+/, '');
+  }
+
+  if (!att.path) return '';
+  return String(att.path)
+    .replace(/\\/g, '/')
+    .replace(/^\/+/, '')
+    .replace(/^api\/uploads\//i, '')
+    .replace(/^uploads\/+/i, '')
+    .replace(/^uploads_data\/+/i, '');
+}
+
 export function resolveAttachmentUrl(att: Attachment): string {
-  const raw = att.url
-    || (att.path ? `/uploads/${String(att.path).replace(/\\/g, '/')}` : '');
-  if (!raw) return '';
-  // Route through /api so nginx always proxies to the backend file store
-  if (raw.startsWith('/uploads/')) return `/api${raw}`;
-  if (raw.startsWith('/api/uploads/')) return raw;
-  return raw;
+  const relative = relativeFromAttachment(att);
+  if (relative) {
+    return `/api/files/serve?path=${encodeURIComponent(relative)}`;
+  }
+  return '';
 }
 
 export function getAttachmentKind(att: Attachment): AttachmentKind {
@@ -17,6 +37,7 @@ export function getAttachmentKind(att: Attachment): AttachmentKind {
   const mime = (att.type || '').toLowerCase();
 
   if (mime.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp|svg|bmp|ico)$/i.test(name)) return 'image';
+  if (mime === 'png' || mime === 'jpg' || mime === 'jpeg' || mime === 'gif' || mime === 'webp') return 'image';
   if (mime.startsWith('video/') || /\.(mp4|webm|ogg|mov|m4v)$/i.test(name)) return 'video';
   if (mime === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
   if (mime.includes('csv') || name.endsWith('.csv')) return 'csv';
@@ -31,15 +52,24 @@ export function getAttachmentKind(att: Attachment): AttachmentKind {
 }
 
 export function mimeForKind(kind: AttachmentKind, attachment?: Attachment | null): string {
+  const rawType = (attachment?.type || '').toLowerCase();
+  if (rawType.includes('/')) return rawType;
+
   switch (kind) {
     case 'pdf': return 'application/pdf';
     case 'csv': return 'text/csv';
     case 'excel':
       if (attachment?.name?.toLowerCase().endsWith('.xls')) return 'application/vnd.ms-excel';
       return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    case 'video': return attachment?.type || 'video/mp4';
-    case 'image': return attachment?.type || 'image/jpeg';
-    default: return attachment?.type || 'application/octet-stream';
+    case 'video': return rawType ? `video/${rawType}` : 'video/mp4';
+    case 'image':
+      if (rawType === 'png') return 'image/png';
+      if (rawType === 'jpg' || rawType === 'jpeg') return 'image/jpeg';
+      if (rawType === 'gif') return 'image/gif';
+      if (rawType === 'webp') return 'image/webp';
+      if (attachment?.name?.toLowerCase().endsWith('.png')) return 'image/png';
+      return 'image/jpeg';
+    default: return 'application/octet-stream';
   }
 }
 
@@ -55,8 +85,19 @@ export function isPdfBuffer(buffer: ArrayBuffer): boolean {
   return new TextDecoder().decode(buffer.slice(0, 5)) === '%PDF-';
 }
 
+function authHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {};
+  try {
+    const token = localStorage.getItem('sp_token');
+    if (token) headers.Authorization = `Bearer ${token}`;
+  } catch {
+    // ignore
+  }
+  return headers;
+}
+
 export async function fetchAttachmentBuffer(url: string): Promise<ArrayBuffer> {
-  const res = await fetch(url);
+  const res = await fetch(url, { headers: authHeaders(), credentials: 'same-origin' });
   if (!res.ok) throw new Error(`Could not load file (${res.status})`);
   const buffer = await res.arrayBuffer();
   if (isLikelyHtml(buffer)) {

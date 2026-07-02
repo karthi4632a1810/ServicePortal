@@ -11,6 +11,11 @@ import {
 import { authenticate, authorize } from '../middleware/auth.js';
 import { createUploadMiddleware } from '../middleware/upload.js';
 import { prepareUploadContext } from '../middleware/prepareUpload.js';
+import { filesController } from '../controllers/files.controller.js';
+
+const filesRoutes = Router();
+filesRoutes.use(authenticate);
+filesRoutes.get('/serve', filesController.serve);
 
 const workflowRoutes = Router();
 workflowRoutes.get('/', workflowController.list);
@@ -52,4 +57,5 @@ export {
   departmentRoutes,
   notificationRoutes,
   uploadRoutes,
+  filesRoutes,
 };

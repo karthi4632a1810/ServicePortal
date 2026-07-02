@@ -155,7 +155,7 @@ export const uploadController = {
         id: `att-${uuidv4().slice(0, 8)}`,
         name: req.file.originalname,
         size: formatFileSize(req.file.size),
-        type: path.extname(req.file.originalname).slice(1).toLowerCase() || 'file',
+        type: req.file.mimetype || path.extname(req.file.originalname).slice(1).toLowerCase() || 'application/octet-stream',
         path: relativePath,
         url: toPublicUploadUrl(relativePath),
         fieldId: req.uploadContext?.fieldId,

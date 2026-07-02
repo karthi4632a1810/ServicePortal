@@ -20,6 +20,7 @@ import {
   departmentRoutes,
   notificationRoutes,
   uploadRoutes,
+  filesRoutes,
 } from './routes/misc.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 
@@ -38,7 +39,8 @@ const limiter = rateLimit({
   legacyHeaders: false,
   skip: (req) => req.path === '/health'
     || req.originalUrl.startsWith('/api/health')
-    || req.originalUrl.startsWith('/api/uploads/'),
+    || req.originalUrl.startsWith('/api/uploads/')
+    || req.originalUrl.startsWith('/api/files/serve'),
   handler: (_req, res) => {
     res.status(429).json({
       success: false,
@@ -66,6 +68,7 @@ app.use('/api/departments', departmentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/api/files', filesRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/audit-logs', auditRoutes);
 app.use('/api/settings', settingsRoutes);
