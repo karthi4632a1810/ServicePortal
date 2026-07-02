@@ -18,6 +18,8 @@ services:
     depends_on:
       frontend:
         condition: service_started
+      backend:
+        condition: service_started
     healthcheck:
       test: ["CMD", "nginx", "-t"]
       interval: 30s

@@ -12,6 +12,8 @@ import { api } from '../services/api';
 import type { RequestStatus, MyTask, Page } from '../types';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
 import { TaskWorkActions } from '../components/tasks/TaskWorkActions';
+import { AttachmentListItem, AttachmentPreviewModal } from '../components/attachments/AttachmentPreviewModal';
+import type { Attachment } from '../types';
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950', border: 'border-blue-200 dark:border-blue-800' },
@@ -62,6 +64,7 @@ export function RequestDetailPage({
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
   const [taskBusy, setTaskBusy] = useState<string | null>(null);
+  const [previewAttachment, setPreviewAttachment] = useState<Attachment | null>(null);
 
   const returnTo = (pageParams.returnTo as Page | undefined) || 'my-requests';
   const taskMode = pageParams.taskMode === true;
@@ -236,20 +239,7 @@ export function RequestDetailPage({
               <CardContent>
                 <div className="space-y-2">
                   {req.attachments.map(att => (
-                    <a
-                      key={att.id}
-                      href={att.url || (att.path ? `/uploads/${att.path}` : '#')}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-3 py-2 rounded-lg border border-border hover:bg-muted/50 transition-colors"
-                    >
-                      <Paperclip className="size-4 text-muted-foreground" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-foreground truncate" style={{ fontSize: '13px' }}>{att.name}</p>
-                        <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{att.size}</p>
-                      </div>
-                      <Download className="size-4 text-muted-foreground hover:text-primary transition-colors" />
-                    </a>
+                    <AttachmentListItem key={att.id} attachment={att} onPreview={setPreviewAttachment} />
                   ))}
                 </div>
               </CardContent>
@@ -465,6 +455,12 @@ export function RequestDetailPage({
           </Card>
         </div>
       </div>
+
+      <AttachmentPreviewModal
+        attachment={previewAttachment}
+        open={Boolean(previewAttachment)}
+        onClose={() => setPreviewAttachment(null)}
+      />
     </motion.div>
   );
 }

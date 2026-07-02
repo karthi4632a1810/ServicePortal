@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
-import { User, Building2, Paperclip, Download } from 'lucide-react';
-import type { FormSchema, Request } from '../../types';
+import React, { useMemo, useState } from 'react';
+import { Paperclip } from 'lucide-react';
+import type { Attachment, FormSchema, Request } from '../../types';
+import { AttachmentListItem, AttachmentPreviewModal } from '../attachments/AttachmentPreviewModal';
 
 function formatAnswerValue(value: unknown): string {
   if (value == null || value === '') return '—';
@@ -80,29 +81,28 @@ export function RequestAnswersSection({
 }
 
 export function RequestAttachmentsSection({ request }: { request: Request }) {
+  const [preview, setPreview] = useState<Attachment | null>(null);
+
   if (!request.attachments?.length) return null;
   return (
-    <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
-      <p className="text-foreground flex items-center gap-1.5" style={{ fontSize: '12px', fontWeight: 600 }}>
-        <Paperclip className="size-3.5 text-primary" />
-        Attachments
-      </p>
-      <div className="space-y-1.5">
-        {request.attachments.map((att) => (
-          <a
-            key={att.id}
-            href={att.url || (att.path ? `/uploads/${att.path}` : '#')}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-2 px-2.5 py-2 rounded-md border border-border bg-card hover:bg-muted/50 transition-colors"
-          >
-            <Paperclip className="size-3.5 text-muted-foreground shrink-0" />
-            <span className="flex-1 min-w-0 truncate text-foreground" style={{ fontSize: '12px' }}>{att.name}</span>
-            <Download className="size-3.5 text-muted-foreground shrink-0" />
-          </a>
-        ))}
+    <>
+      <div className="rounded-lg border border-border/60 bg-muted/20 p-3 space-y-2">
+        <p className="text-foreground flex items-center gap-1.5" style={{ fontSize: '12px', fontWeight: 600 }}>
+          <Paperclip className="size-3.5 text-primary" />
+          Attachments
+        </p>
+        <div className="space-y-1.5">
+          {request.attachments.map((att) => (
+            <AttachmentListItem key={att.id} attachment={att} onPreview={setPreview} />
+          ))}
+        </div>
       </div>
-    </div>
+      <AttachmentPreviewModal
+        attachment={preview}
+        open={Boolean(preview)}
+        onClose={() => setPreview(null)}
+      />
+    </>
   );
 }
 
