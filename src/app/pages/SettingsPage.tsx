@@ -304,19 +304,21 @@ export function SettingsPage() {
                   {notifError && (
                     <p className="text-destructive mb-4" style={{ fontSize: '13px' }}>{notifError}</p>
                   )}
-                  <div className="mb-4">
-                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Email Notifications</p>
-                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" checked={notificationPrefs.emailSubmitted} onChange={(v) => void handleNotificationChange('emailSubmitted', v)} />
-                    <ToggleSetting label="Approval Required" desc="When your approval is needed on a request" checked={notificationPrefs.emailApproval} onChange={(v) => void handleNotificationChange('emailApproval', v)} />
-                    <ToggleSetting label="Request Approved" desc="When your request gets approved" checked={notificationPrefs.emailApproved} onChange={(v) => void handleNotificationChange('emailApproved', v)} />
-                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" checked={notificationPrefs.emailRejected} onChange={(v) => void handleNotificationChange('emailRejected', v)} />
-                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" checked={notificationPrefs.emailCompleted} onChange={(v) => void handleNotificationChange('emailCompleted', v)} />
-                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" checked={notificationPrefs.emailReminder} onChange={(v) => void handleNotificationChange('emailReminder', v)} />
-                  </div>
                   <div>
-                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>In-App Notifications</p>
-                    <ToggleSetting label="Real-time Updates" desc="Instant notifications for all activity" checked={notificationPrefs.inAppRealtime} onChange={(v) => void handleNotificationChange('inAppRealtime', v)} />
-                    <ToggleSetting label="Daily Digest" desc="Daily summary email of pending items" checked={notificationPrefs.emailDailyDigest} onChange={(v) => void handleNotificationChange('emailDailyDigest', v)} />
+                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                      Bell Notifications (in-app only)
+                    </p>
+                    <p className="text-muted-foreground mb-4" style={{ fontSize: '12px' }}>
+                      Control which alerts appear in the top notification bell. These settings do not send emails.
+                    </p>
+                    <ToggleSetting label="Real-time Updates" desc="Master switch for all bell notifications" checked={notificationPrefs.inAppRealtime} onChange={(v) => void handleNotificationChange('inAppRealtime', v)} />
+                    <ToggleSetting label="New Task" desc="When you are assigned a new task" checked={notificationPrefs.inAppNewTask} onChange={(v) => void handleNotificationChange('inAppNewTask', v)} />
+                    <ToggleSetting label="Request Submitted" desc="When a new request is submitted to your queue" checked={notificationPrefs.inAppSubmitted} onChange={(v) => void handleNotificationChange('inAppSubmitted', v)} />
+                    <ToggleSetting label="Approval Required" desc="When your approval or confirmation is needed" checked={notificationPrefs.inAppApprovalRequired} onChange={(v) => void handleNotificationChange('inAppApprovalRequired', v)} />
+                    <ToggleSetting label="Request Approved" desc="When your request gets approved" checked={notificationPrefs.inAppRequestApproved} onChange={(v) => void handleNotificationChange('inAppRequestApproved', v)} />
+                    <ToggleSetting label="Request Rejected" desc="When your request is rejected" checked={notificationPrefs.inAppRequestRejected} onChange={(v) => void handleNotificationChange('inAppRequestRejected', v)} />
+                    <ToggleSetting label="Request Completed" desc="When a request is fully processed" checked={notificationPrefs.inAppRequestCompleted} onChange={(v) => void handleNotificationChange('inAppRequestCompleted', v)} />
+                    <ToggleSetting label="SLA Reminder" desc="Reminder when requests approach SLA deadline" checked={notificationPrefs.inAppSlaReminder} onChange={(v) => void handleNotificationChange('inAppSlaReminder', v)} />
                   </div>
                 </CardContent>
               </Card>

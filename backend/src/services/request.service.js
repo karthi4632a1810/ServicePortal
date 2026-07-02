@@ -376,6 +376,7 @@ export class RequestService {
     if (!request.assignees) request.assignees = [];
 
     const added = [];
+    const notifyUsers = [];
     const receiverDept = request.department || request.employee?.department;
     for (const id of ids) {
       if (request.assignees.some((a) => String(a.employeeId) === id)) continue;
@@ -402,6 +403,7 @@ export class RequestService {
         status: 'pending',
       });
       added.push(`${employee.name} (${id})`);
+      if (assigneeUser) notifyUsers.push(assigneeUser);
     }
 
     if (!added.length) throw new AppError('All staff IDs are already assigned', 400);
@@ -424,6 +426,8 @@ export class RequestService {
     });
 
     await request.save();
+
+    await notificationService.notifyNewTask(request, notifyUsers);
 
     await ApprovalLog.create({
       requestId: request._id,

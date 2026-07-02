@@ -191,6 +191,17 @@ export interface AuditLog {
   severity: 'info' | 'warning' | 'error' | 'success';
 }
 
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  requestId?: string;
+  requestNumber?: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export interface Approver {
   id: string;
   name: string;

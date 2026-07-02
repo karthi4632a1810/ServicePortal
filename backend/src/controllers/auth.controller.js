@@ -91,14 +91,14 @@ const preferencesSchema = z.object({
 
 const notificationPreferencesSchema = z.object({
   body: z.object({
-    emailSubmitted: z.boolean().optional(),
-    emailApproval: z.boolean().optional(),
-    emailApproved: z.boolean().optional(),
-    emailRejected: z.boolean().optional(),
-    emailCompleted: z.boolean().optional(),
-    emailReminder: z.boolean().optional(),
     inAppRealtime: z.boolean().optional(),
-    emailDailyDigest: z.boolean().optional(),
+    inAppNewTask: z.boolean().optional(),
+    inAppSubmitted: z.boolean().optional(),
+    inAppApprovalRequired: z.boolean().optional(),
+    inAppRequestApproved: z.boolean().optional(),
+    inAppRequestRejected: z.boolean().optional(),
+    inAppRequestCompleted: z.boolean().optional(),
+    inAppSlaReminder: z.boolean().optional(),
   }),
 });
 

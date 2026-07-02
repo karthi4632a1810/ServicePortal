@@ -28,18 +28,32 @@ async function sendEmail(to, subject, text) {
   return true;
 }
 
-function prefEnabled(user, key) {
-  return user?.notificationPreferences?.[key] !== false;
-}
-
-function wantsInApp(user) {
-  return user?.notificationPreferences?.inAppRealtime !== false;
+function wantsInApp(user, ...prefKeys) {
+  if (!user) return false;
+  const prefs = user.notificationPreferences || {};
+  if (prefs.inAppRealtime === false) return false;
+  if (!prefKeys.length) return true;
+  return prefKeys.some((key) => prefs[key] !== false);
 }
 
 async function findEmployeeUser(request) {
   const email = request.employee?.email?.toLowerCase();
   if (!email) return null;
   return User.findOne({ email, active: true });
+}
+
+function mapNotification(doc) {
+  const n = doc.toObject ? doc.toObject() : doc;
+  return {
+    id: n._id.toString(),
+    type: n.type,
+    title: n.title,
+    message: n.message,
+    requestId: n.requestId?.toString?.() || n.requestId,
+    requestNumber: n.requestNumber,
+    read: n.read === true,
+    createdAt: n.createdAt?.toISOString?.() || n.createdAt,
+  };
 }
 
 export class NotificationService {
@@ -52,11 +66,11 @@ export class NotificationService {
       requestId,
       requestNumber,
     });
-    return notification;
+    return mapNotification(notification);
   }
 
-  async createIfEnabled(user, payload) {
-    if (!user || !wantsInApp(user)) return null;
+  async createIfEnabled(user, payload, ...prefKeys) {
+    if (!wantsInApp(user, ...prefKeys)) return null;
     return this.create({ userId: user._id, ...payload });
   }
 
@@ -77,22 +91,22 @@ export class NotificationService {
         message: `${request.formTitle} (${request.requestNumber}) requires your approval`,
         requestId: request._id,
         requestNumber: request.requestNumber,
-      });
+      }, 'inAppApprovalRequired', 'inAppSubmitted');
+    }
+  }
 
-      const wantsEmail = prefEnabled(user, 'emailSubmitted') || prefEnabled(user, 'emailApproval');
-      if (wantsEmail) {
-        const sent = await sendEmail(
-          user.email,
-          `Approval Required: ${request.requestNumber}`,
-          `${request.employee.name} submitted ${request.formTitle}. Please review and approve.`
-        );
-        if (sent) {
-          await Notification.updateOne(
-            { userId: user._id, requestNumber: request.requestNumber },
-            { emailSent: true }
-          );
-        }
-      }
+  async notifyNewTask(request, assigneeUsers = []) {
+    for (const user of assigneeUsers) {
+      if (!user?._id) continue;
+      const fullUser = user.notificationPreferences ? user : await User.findById(user._id);
+      if (!fullUser) continue;
+      await this.createIfEnabled(fullUser, {
+        type: 'new_task',
+        title: 'New Task Assigned',
+        message: `You were assigned: ${request.formTitle} (${request.requestNumber})`,
+        requestId: request._id,
+        requestNumber: request.requestNumber,
+      }, 'inAppNewTask');
     }
   }
 
@@ -105,9 +119,9 @@ export class NotificationService {
       message: `Your request "${request.formTitle}" (${request.requestNumber}) was approved by ${approver.name}`,
       requestId: request._id,
       requestNumber: request.requestNumber,
-    });
+    }, 'inAppRequestApproved');
 
-    if (!employeeUser || prefEnabled(employeeUser, 'emailApproved')) {
+    if (employeeUser?.notificationPreferences?.emailApproved === true) {
       await sendEmail(
         request.employee.email,
         `Request Approved: ${request.requestNumber}`,
@@ -125,9 +139,9 @@ export class NotificationService {
       message: `Your request "${request.formTitle}" (${request.requestNumber}) was rejected by ${approver.name}`,
       requestId: request._id,
       requestNumber: request.requestNumber,
-    });
+    }, 'inAppRequestRejected');
 
-    if (!employeeUser || prefEnabled(employeeUser, 'emailRejected')) {
+    if (employeeUser?.notificationPreferences?.emailRejected === true) {
       await sendEmail(
         request.employee.email,
         `Request Rejected: ${request.requestNumber}`,
@@ -145,9 +159,9 @@ export class NotificationService {
       message: `Your request "${request.formTitle}" (${request.requestNumber}) has been completed`,
       requestId: request._id,
       requestNumber: request.requestNumber,
-    });
+    }, 'inAppRequestCompleted');
 
-    if (!employeeUser || prefEnabled(employeeUser, 'emailCompleted')) {
+    if (employeeUser?.notificationPreferences?.emailCompleted === true) {
       await sendEmail(
         request.employee.email,
         `Request Completed: ${request.requestNumber}`,
@@ -170,9 +184,9 @@ export class NotificationService {
         message: `${request.formTitle} (${request.requestNumber}) — ${staffUser.name} finished work and awaits your confirmation`,
         requestId: request._id,
         requestNumber: request.requestNumber,
-      });
+      }, 'inAppApprovalRequired');
 
-      if (prefEnabled(user, 'emailApproval')) {
+      if (user.notificationPreferences?.emailApproval === true) {
         await sendEmail(
           user.email,
           `Confirm Completion: ${request.requestNumber}`,
@@ -182,13 +196,28 @@ export class NotificationService {
     }
   }
 
-  async getForUser(userId, { page = 1, limit = 20 } = {}) {
+  async getForUser(userId, { page = 1, limit = 30 } = {}) {
     const skip = (page - 1) * limit;
-    const [items, total] = await Promise.all([
+    const [items, total, unread] = await Promise.all([
       Notification.find({ userId }).sort('-createdAt').skip(skip).limit(limit),
       Notification.countDocuments({ userId }),
+      Notification.countDocuments({ userId, read: false }),
     ]);
-    return { items, total, page, limit };
+    return {
+      items: items.map(mapNotification),
+      total,
+      unread,
+      page,
+      limit,
+    };
+  }
+
+  async markRead(userId, notificationId) {
+    await Notification.updateOne({ _id: notificationId, userId }, { $set: { read: true } });
+  }
+
+  async markAllRead(userId) {
+    await Notification.updateMany({ userId, read: false }, { $set: { read: true } });
   }
 }
 

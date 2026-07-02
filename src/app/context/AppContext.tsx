@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from 'react';
 
-import type { Page, Approver, Request, FormSchema, AuditLog, DashboardStats, Employee } from '../types';
+import type { Page, Approver, Request, FormSchema, AuditLog, DashboardStats, Employee, AppNotification } from '../types';
 
 import { api } from '../services/api';
 import { fetchEmployeeTiered } from '../utils/fetchEmployeeTiered';
@@ -15,6 +15,7 @@ import {
   DEFAULT_NOTIFICATION_PREFERENCES,
   type NotificationPreferences,
 } from '../utils/notificationPreferences';
+import { getPageForNotification, getParamsForNotification } from '../utils/notificationNavigation';
 
 const EMPTY_DASHBOARD: DashboardStats = {
 
@@ -151,6 +152,14 @@ interface AppContextValue {
 
   loadAuditLogs: () => Promise<void>;
 
+  notifications: AppNotification[];
+
+  unreadNotificationCount: number;
+
+  refreshNotifications: () => Promise<void>;
+
+  openNotification: (notification: AppNotification) => Promise<void>;
+
 }
 
 
@@ -203,6 +212,10 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const [error, setError] = useState<string | null>(null);
 
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+
   const currentUserRef = useRef(currentUser);
   currentUserRef.current = currentUser;
 
@@ -211,6 +224,18 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
 
   const registerScreenRefresh = useCallback((handler: (() => void | Promise<void>) | null) => {
     screenRefreshRef.current = handler;
+  }, []);
+
+  const refreshNotifications = useCallback(async () => {
+    if (!api.getToken()) return;
+    try {
+      const res = await api.getNotifications();
+      setNotifications(res.data);
+      setUnreadNotificationCount(res.pagination?.unread ?? res.data.filter((n) => !n.read).length);
+    } catch {
+      setNotifications([]);
+      setUnreadNotificationCount(0);
+    }
   }, []);
 
   const refreshScreen = useCallback(async () => {
@@ -291,6 +316,48 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
     setSelectedRequest(prev => (prev?.id === updated.id ? updated : prev));
 
   }, []);
+
+  const openNotification = useCallback(async (notification: AppNotification) => {
+    try {
+      if (!notification.read) {
+        await api.markNotificationRead(notification.id);
+        setNotifications((prev) => prev.map((n) => (n.id === notification.id ? { ...n, read: true } : n)));
+        setUnreadNotificationCount((count) => Math.max(0, count - 1));
+      }
+    } catch {
+      // continue navigation even if mark-read fails
+    }
+
+    if (notification.requestId) {
+      try {
+        const res = await api.getRequest(notification.requestId);
+        setSelectedRequest(res.data);
+        updateRequest(res.data);
+      } catch {
+        // navigate without preloaded request
+      }
+    }
+
+    const page = getPageForNotification(notification, currentUserRef.current?.role);
+    const params = getParamsForNotification(notification, page);
+    setCurrentPage(page);
+    setPageParams(params);
+  }, [updateRequest]);
+
+  useEffect(() => {
+    if (!isAuthenticated) {
+      setNotifications([]);
+      setUnreadNotificationCount(0);
+      return;
+    }
+
+    void refreshNotifications();
+    const intervalId = window.setInterval(() => {
+      void refreshNotifications();
+    }, 30_000);
+
+    return () => window.clearInterval(intervalId);
+  }, [isAuthenticated, refreshNotifications]);
 
 
 
@@ -630,6 +697,14 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       loadDashboard,
 
       loadAuditLogs,
+
+      notifications,
+
+      unreadNotificationCount,
+
+      refreshNotifications,
+
+      openNotification,
     }}>
 
       {children}

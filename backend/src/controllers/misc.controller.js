@@ -136,8 +136,26 @@ export const notificationController = {
       return successResponse(res, {
         message: 'Notifications retrieved',
         data: result.items,
-        pagination: { total: result.total, page: result.page, limit: result.limit },
+        pagination: { total: result.total, unread: result.unread, page: result.page, limit: result.limit },
       });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  markRead: async (req, res, next) => {
+    try {
+      await notificationService.markRead(req.user._id, req.params.id);
+      return successResponse(res, { message: 'Notification marked as read' });
+    } catch (err) {
+      next(err);
+    }
+  },
+
+  markAllRead: async (req, res, next) => {
+    try {
+      await notificationService.markAllRead(req.user._id);
+      return successResponse(res, { message: 'All notifications marked as read' });
     } catch (err) {
       next(err);
     }

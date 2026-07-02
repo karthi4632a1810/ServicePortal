@@ -5,7 +5,15 @@ const notificationSchema = new mongoose.Schema(
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', index: true },
     type: {
       type: String,
-      enum: ['approval_required', 'approved', 'rejected', 'completed', 'reminder', 'info'],
+      enum: [
+        'new_task',
+        'approval_required',
+        'request_approved',
+        'request_rejected',
+        'request_completed',
+        'reminder',
+        'info',
+      ],
       required: true,
     },
     title: String,

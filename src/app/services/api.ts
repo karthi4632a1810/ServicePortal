@@ -8,7 +8,8 @@ interface ApiResponse<T> {
     total: number;
     page: number;
     limit: number;
-    totalPages: number;
+    totalPages?: number;
+    unread?: number;
   };
 }
 
@@ -350,7 +351,15 @@ class ApiClient {
 
   // Notifications
   getNotifications() {
-    return this.request<Array<Record<string, unknown>>>('/notifications');
+    return this.request<import('../types').AppNotification[]>('/notifications');
+  }
+
+  markNotificationRead(id: string) {
+    return this.request<null>(`/notifications/${id}/read`, { method: 'PATCH' });
+  }
+
+  markAllNotificationsRead() {
+    return this.request<null>('/notifications/read-all', { method: 'PATCH' });
   }
 
   // Settings

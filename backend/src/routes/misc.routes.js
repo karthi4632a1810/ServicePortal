@@ -44,6 +44,8 @@ departmentRoutes.get('/:code/queue', authenticate, departmentController.queue);
 const notificationRoutes = Router();
 notificationRoutes.use(authenticate);
 notificationRoutes.get('/', notificationController.list);
+notificationRoutes.patch('/read-all', notificationController.markAllRead);
+notificationRoutes.patch('/:id/read', notificationController.markRead);
 
 const uploadRoutes = Router();
 const uploadHandler = createUploadMiddleware();

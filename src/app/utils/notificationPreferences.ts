@@ -1,21 +1,21 @@
 export interface NotificationPreferences {
-  emailSubmitted: boolean;
-  emailApproval: boolean;
-  emailApproved: boolean;
-  emailRejected: boolean;
-  emailCompleted: boolean;
-  emailReminder: boolean;
   inAppRealtime: boolean;
-  emailDailyDigest: boolean;
+  inAppNewTask: boolean;
+  inAppSubmitted: boolean;
+  inAppApprovalRequired: boolean;
+  inAppRequestApproved: boolean;
+  inAppRequestRejected: boolean;
+  inAppRequestCompleted: boolean;
+  inAppSlaReminder: boolean;
 }
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
-  emailSubmitted: true,
-  emailApproval: true,
-  emailApproved: true,
-  emailRejected: true,
-  emailCompleted: false,
-  emailReminder: true,
   inAppRealtime: true,
-  emailDailyDigest: false,
+  inAppNewTask: true,
+  inAppSubmitted: true,
+  inAppApprovalRequired: true,
+  inAppRequestApproved: true,
+  inAppRequestRejected: true,
+  inAppRequestCompleted: true,
+  inAppSlaReminder: true,
 };

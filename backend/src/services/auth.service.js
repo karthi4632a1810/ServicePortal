@@ -77,14 +77,14 @@ export class AuthService {
   formatNotificationPreferences(user) {
     const n = user.notificationPreferences || {};
     return {
-      emailSubmitted: n.emailSubmitted ?? true,
-      emailApproval: n.emailApproval ?? true,
-      emailApproved: n.emailApproved ?? true,
-      emailRejected: n.emailRejected ?? true,
-      emailCompleted: n.emailCompleted ?? false,
-      emailReminder: n.emailReminder ?? true,
       inAppRealtime: n.inAppRealtime ?? true,
-      emailDailyDigest: n.emailDailyDigest ?? false,
+      inAppNewTask: n.inAppNewTask ?? true,
+      inAppSubmitted: n.inAppSubmitted ?? true,
+      inAppApprovalRequired: n.inAppApprovalRequired ?? true,
+      inAppRequestApproved: n.inAppRequestApproved ?? true,
+      inAppRequestRejected: n.inAppRequestRejected ?? true,
+      inAppRequestCompleted: n.inAppRequestCompleted ?? true,
+      inAppSlaReminder: n.inAppSlaReminder ?? true,
     };
   }
 
@@ -109,14 +109,14 @@ export class AuthService {
 
   async updateNotificationPreferences(userId, patch) {
     const allowed = [
-      'emailSubmitted',
-      'emailApproval',
-      'emailApproved',
-      'emailRejected',
-      'emailCompleted',
-      'emailReminder',
       'inAppRealtime',
-      'emailDailyDigest',
+      'inAppNewTask',
+      'inAppSubmitted',
+      'inAppApprovalRequired',
+      'inAppRequestApproved',
+      'inAppRequestRejected',
+      'inAppRequestCompleted',
+      'inAppSlaReminder',
     ];
     const update = {};
     for (const key of allowed) {
