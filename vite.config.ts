@@ -43,6 +43,8 @@ export default defineConfig({
         ],
       },
       workbox: {
+        // Main bundle includes pdfjs + xlsx; default 2 MiB precache limit fails production builds
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
         runtimeCaching: [
           {
