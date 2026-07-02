@@ -9,13 +9,17 @@ import { cn } from '../ui/utils';
 import type { Attachment } from '../../types';
 import {
   fetchAttachmentBlobUrl,
+  fetchAttachmentBuffer,
   getAttachmentKind,
-  loadSpreadsheetRows,
+  isPdfBuffer,
+  mimeForKind,
   parseCsvText,
+  parseSpreadsheetBuffer,
   resolveAttachmentUrl,
   revokeBlobUrl,
   type AttachmentKind,
 } from '../../utils/attachmentUtils';
+import { PdfPreview } from './PdfPreview';
 
 const KIND_META: Record<AttachmentKind, { label: string; icon: React.ElementType; tone: string }> = {
   pdf: { label: 'PDF', icon: FileText, tone: 'text-red-600 bg-red-50 dark:bg-red-950/40' },
@@ -29,13 +33,6 @@ const KIND_META: Record<AttachmentKind, { label: string; icon: React.ElementType
 const MIN_ZOOM = 0.35;
 const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.15;
-
-function mimeForKind(kind: AttachmentKind, attachment?: Attachment | null): string | undefined {
-  if (attachment?.type) return attachment.type;
-  if (kind === 'pdf') return 'application/pdf';
-  if (kind === 'video') return 'video/mp4';
-  return undefined;
-}
 
 function ZoomableSurface({
   zoom,
@@ -122,6 +119,7 @@ export function AttachmentPreviewModal({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [blobUrl, setBlobUrl] = useState<string | null>(null);
+  const [pdfData, setPdfData] = useState<ArrayBuffer | null>(null);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [sheetLabel, setSheetLabel] = useState('');
   const [sheetRows, setSheetRows] = useState<string[][]>([]);
@@ -148,6 +146,7 @@ export function AttachmentPreviewModal({
   useEffect(() => {
     if (!open || !attachment || !url) {
       setBlobUrl(null);
+      setPdfData(null);
       setError(null);
       setCsvRows([]);
       setSheetRows([]);
@@ -160,6 +159,7 @@ export function AttachmentPreviewModal({
     setCsvRows([]);
     setSheetRows([]);
     setSheetLabel('');
+    setPdfData(null);
 
     let cancelled = false;
     let createdBlobUrl: string | null = null;
@@ -167,16 +167,24 @@ export function AttachmentPreviewModal({
     const load = async () => {
       setLoading(true);
       try {
-        if (kind === 'pdf' || kind === 'image' || kind === 'video') {
-          createdBlobUrl = await fetchAttachmentBlobUrl(url, mimeForKind(kind, attachment));
+        const mime = mimeForKind(kind, attachment);
+
+        if (kind === 'pdf') {
+          const buffer = await fetchAttachmentBuffer(url);
+          if (!isPdfBuffer(buffer)) {
+            throw new Error('This file is not a valid PDF.');
+          }
+          if (!cancelled) setPdfData(buffer);
+        } else if (kind === 'image' || kind === 'video') {
+          createdBlobUrl = await fetchAttachmentBlobUrl(url, mime);
           if (!cancelled) setBlobUrl(createdBlobUrl);
         } else if (kind === 'csv') {
-          const res = await fetch(url);
-          if (!res.ok) throw new Error('Could not load CSV file');
-          const text = await res.text();
+          const buffer = await fetchAttachmentBuffer(url);
+          const text = new TextDecoder().decode(buffer);
           if (!cancelled) setCsvRows(parseCsvText(text));
         } else if (kind === 'excel') {
-          const { sheetName, rows } = await loadSpreadsheetRows(url);
+          const buffer = await fetchAttachmentBuffer(url);
+          const { sheetName, rows } = await parseSpreadsheetBuffer(buffer);
           if (!cancelled) {
             setSheetLabel(sheetName);
             setSheetRows(rows);
@@ -197,6 +205,7 @@ export function AttachmentPreviewModal({
       cancelled = true;
       revokeBlobUrl(createdBlobUrl);
       setBlobUrl(null);
+      setPdfData(null);
     };
   }, [open, attachment, url, kind]);
 
@@ -211,16 +220,35 @@ export function AttachmentPreviewModal({
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose, zoomIn, zoomOut]);
 
-  const handleWheel = (e: React.WheelEvent) => {
+  // Ctrl/Cmd + scroll to zoom; plain scroll pans the preview area
+  useEffect(() => {
+    if (!open) return;
+    const el = surfaceRef.current;
+    if (!el) return;
     if (kind === 'video' || kind === 'unknown') return;
-    e.preventDefault();
-    if (e.deltaY < 0) zoomIn();
-    else zoomOut();
-  };
+
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey && !e.metaKey) return;
+      e.preventDefault();
+      if (e.deltaY < 0) zoomIn();
+      else zoomOut();
+    };
+
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => el.removeEventListener('wheel', onWheel);
+  }, [open, kind, zoomIn, zoomOut]);
 
   const handleDownload = () => {
     if (!attachment) return;
-    const href = blobUrl || url;
+    let href = blobUrl || url;
+    let revokeAfter = false;
+
+    if (pdfData) {
+      const blob = new Blob([pdfData], { type: 'application/pdf' });
+      href = URL.createObjectURL(blob);
+      revokeAfter = true;
+    }
+
     if (!href) return;
     const a = document.createElement('a');
     a.href = href;
@@ -229,6 +257,7 @@ export function AttachmentPreviewModal({
     document.body.appendChild(a);
     a.click();
     a.remove();
+    if (revokeAfter) URL.revokeObjectURL(href);
   };
 
   const renderContent = () => {
@@ -273,14 +302,9 @@ export function AttachmentPreviewModal({
           </ZoomableSurface>
         ) : null;
       case 'pdf':
-        return blobUrl ? (
-          <ZoomableSurface zoom={zoom} className="bg-neutral-200 dark:bg-neutral-900">
-            <iframe
-              title={attachment.name}
-              src={blobUrl}
-              className="rounded-lg border border-border/60 bg-white shadow-xl"
-              style={{ width: '850px', height: '1100px', maxWidth: '90vw' }}
-            />
+        return pdfData ? (
+          <ZoomableSurface zoom={1} className="bg-neutral-200 dark:bg-neutral-900">
+            <PdfPreview data={pdfData} zoom={zoom} />
           </ZoomableSurface>
         ) : null;
       case 'video':
@@ -367,6 +391,9 @@ export function AttachmentPreviewModal({
               </p>
               <p className="text-muted-foreground" style={{ fontSize: '11px' }}>
                 {meta.label}{attachment.size ? ` · ${attachment.size}` : ''}
+                {kind !== 'video' && kind !== 'unknown' && (
+                  <span className="hidden sm:inline text-muted-foreground/70"> · Ctrl + scroll to zoom</span>
+                )}
               </p>
             </div>
 
@@ -408,11 +435,10 @@ export function AttachmentPreviewModal({
             </button>
           </div>
 
-          {/* Preview — scroll only inside this area */}
+          {/* Preview — scroll inside; Ctrl + scroll to zoom */}
           <div
             ref={surfaceRef}
-            className="flex-1 min-h-0 flex flex-col overflow-hidden touch-none"
-            onWheel={handleWheel}
+            className="flex-1 min-h-0 flex flex-col overflow-hidden"
           >
             {renderContent()}
           </div>
