@@ -9,8 +9,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '../components/ui/card'
 import { cn } from '../components/ui/utils';
 import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
-import type { RequestStatus } from '../types';
+import type { RequestStatus, MyTask, Page } from '../types';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { TaskWorkActions } from '../components/tasks/TaskWorkActions';
 
 const STATUS_CONFIG: Record<RequestStatus, { label: string; icon: React.ElementType; color: string; bg: string; border: string }> = {
   submitted: { label: 'Submitted', icon: FileText, color: 'text-blue-600', bg: 'bg-blue-50 dark:bg-blue-950', border: 'border-blue-200 dark:border-blue-800' },
@@ -55,11 +56,15 @@ export function RequestDetailPage({
   publicMode?: boolean;
   onBack?: () => void;
 } = {}) {
-  const { selectedRequest, navigate, performApprovalAction, currentUser, updateRequest } = useApp();
+  const { selectedRequest, navigate, performApprovalAction, currentUser, updateRequest, pageParams } = useApp();
   const [comment, setComment] = useState('');
   const [activeAction, setActiveAction] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [actionError, setActionError] = useState('');
+  const [taskBusy, setTaskBusy] = useState<string | null>(null);
+
+  const returnTo = (pageParams.returnTo as Page | undefined) || 'my-requests';
+  const taskMode = pageParams.taskMode === true;
 
   const reloadRequest = useCallback(async () => {
     if (!selectedRequest?.id) return;
@@ -69,17 +74,37 @@ export function RequestDetailPage({
 
   useScreenRefresh(reloadRequest);
 
+  const handleTaskStart = async (id: string) => {
+    setTaskBusy(id);
+    try {
+      await api.updateQueueStatus(id, { queueStatus: 'in_progress' });
+      await reloadRequest();
+    } finally {
+      setTaskBusy(null);
+    }
+  };
+
+  const handleTaskFinish = async (id: string, remarks: string) => {
+    setTaskBusy(id);
+    try {
+      await api.submitForReview(id, remarks);
+      await reloadRequest();
+    } finally {
+      setTaskBusy(null);
+    }
+  };
+
   const req = selectedRequest;
   if (!req) {
     return (
       <div className="p-6 text-center">
         <p className="text-muted-foreground" style={{ fontSize: '14px' }}>No request selected</p>
         <button
-          onClick={() => (publicMode ? onBack?.() : navigate('approvals'))}
+          onClick={() => (publicMode ? onBack?.() : navigate(returnTo))}
           className="mt-4 text-primary hover:underline"
           style={{ fontSize: '13px' }}
         >
-          {publicMode ? 'Back to Track' : 'Back to Approvals'}
+          {publicMode ? 'Back to Track' : 'Back'}
         </button>
       </div>
     );
@@ -124,7 +149,7 @@ export function RequestDetailPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex items-start gap-3 min-w-0">
           <button
-            onClick={() => (publicMode ? onBack?.() : navigate('my-requests'))}
+            onClick={() => (publicMode ? onBack?.() : navigate(returnTo))}
             className="size-9 sm:size-8 flex items-center justify-center rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors shrink-0"
           >
             <ChevronLeft className="size-4" />
@@ -314,6 +339,23 @@ export function RequestDetailPage({
 
         {/* Right: Workflow + Timeline */}
         <div className="space-y-5">
+          {taskMode && req.status === 'processing' && (
+            <Card className="border-primary/30 shadow-sm">
+              <CardHeader>
+                <CardTitle>Your Task</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TaskWorkActions
+                  task={req as MyTask}
+                  onStart={handleTaskStart}
+                  onFinish={handleTaskFinish}
+                  busy={taskBusy}
+                  compact
+                />
+              </CardContent>
+            </Card>
+          )}
+
           {/* Workflow Progress */}
           <Card className="border-border/60 shadow-sm">
             <CardHeader>

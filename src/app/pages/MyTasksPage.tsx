@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
-  ClipboardList, Play, CheckCircle, Clock, Loader2, AlertCircle, Search, RotateCcw,
+  ClipboardList, CheckCircle, Clock, Loader2, AlertCircle, Search, RotateCcw,
+  ChevronDown, Eye, ExternalLink,
 } from 'lucide-react';
 import { cn } from '../components/ui/utils';
 import { RippleButton } from '../components/animations/RippleButton';
@@ -9,6 +10,8 @@ import { useApp } from '../context/AppContext';
 import { api } from '../services/api';
 import type { MyTask } from '../types';
 import { useScreenRefresh } from '../hooks/useScreenRefresh';
+import { RequestDetailSections } from '../components/requests/RequestDetailSections';
+import { TaskWorkActions } from '../components/tasks/TaskWorkActions';
 
 type TaskQueueStatus = 'pending' | 'in_progress' | 'pending_hod_review';
 
@@ -22,87 +25,83 @@ function WorkTaskCard({
   task,
   onStart,
   onFinish,
+  onViewFull,
   busy,
+  forms,
 }: {
   task: MyTask;
   onStart: (id: string) => Promise<void>;
   onFinish: (id: string, remarks: string) => Promise<void>;
+  onViewFull: (task: MyTask) => void;
   busy: string | null;
+  forms: import('../types').FormSchema[];
 }) {
-  const [showFinish, setShowFinish] = useState(false);
-  const [remarks, setRemarks] = useState('');
-  const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const qs = (task.queueStatus || 'pending') as TaskQueueStatus;
   const cfg = QUEUE_LABELS[qs] || QUEUE_LABELS.pending;
-  const isBusy = busy === task.id;
-
-  const handleFinish = async () => {
-    if (!remarks.trim()) {
-      setError('Remarks are required when finishing work');
-      return;
-    }
-    setError('');
-    await onFinish(task.id, remarks.trim());
-    setShowFinish(false);
-    setRemarks('');
-  };
 
   return (
-    <motion.div layout className="bg-card border border-border/60 rounded-xl p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="min-w-0">
-          <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>{task.formTitle}</p>
-          <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{task.requestNumber}</p>
-        </div>
-        <span className={cn('px-2 py-0.5 rounded-md shrink-0', cfg.bg, cfg.color)} style={{ fontSize: '10px', fontWeight: 600 }}>
-          {cfg.label}
-        </span>
-      </div>
-
-      <p className="text-muted-foreground mb-3" style={{ fontSize: '12px' }}>
-        Requested by <strong className="text-foreground">{task.employee.name}</strong> · {task.employee.department}
-      </p>
-
-      {qs === 'pending' && (
-        <RippleButton variant="primary" className="w-full justify-center" icon={<Play className="size-4" />} disabled={isBusy} onClick={() => void onStart(task.id)}>
-          {isBusy ? 'Starting...' : 'Start'}
-        </RippleButton>
-      )}
-
-      {qs === 'in_progress' && !showFinish && (
-        <RippleButton variant="success" className="w-full justify-center" icon={<CheckCircle className="size-4" />} disabled={isBusy} onClick={() => setShowFinish(true)}>
-          Finish
-        </RippleButton>
-      )}
-
-      {qs === 'in_progress' && showFinish && (
-        <div className="space-y-2">
-          <textarea
-            value={remarks}
-            onChange={(e) => { setRemarks(e.target.value); setError(''); }}
-            placeholder="Describe what was done (required)..."
-            rows={3}
-            className="w-full px-3 py-2 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm resize-none"
-          />
-          {error && (
-            <p className="text-destructive flex items-center gap-1" style={{ fontSize: '11px' }}>
-              <AlertCircle className="size-3" /> {error}
-            </p>
-          )}
-          <div className="flex gap-2">
-            <RippleButton variant="ghost" className="flex-1" onClick={() => { setShowFinish(false); setRemarks(''); setError(''); }}>Cancel</RippleButton>
-            <RippleButton variant="success" className="flex-1 justify-center" disabled={isBusy} onClick={() => void handleFinish()}>
-              {isBusy ? 'Submitting...' : 'Submit for Review'}
-            </RippleButton>
+    <motion.div layout className="bg-card border border-border/60 rounded-xl shadow-sm overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>{task.formTitle}</p>
+            <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{task.requestNumber}</p>
           </div>
+          <span className={cn('px-2 py-0.5 rounded-md shrink-0', cfg.bg, cfg.color)} style={{ fontSize: '10px', fontWeight: 600 }}>
+            {cfg.label}
+          </span>
         </div>
-      )}
 
-      {qs === 'pending_hod_review' && (
-        <p className="text-muted-foreground text-center py-2" style={{ fontSize: '12px' }}>
-          Submitted for HOD confirmation. You will be notified if rework is needed.
+        <p className="text-muted-foreground mb-3" style={{ fontSize: '12px' }}>
+          Requested by <strong className="text-foreground">{task.employee.name}</strong> · {task.employee.department}
         </p>
-      )}
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors',
+              expanded
+                ? 'border-primary bg-primary/10 text-primary'
+                : 'border-border text-muted-foreground hover:text-foreground hover:border-primary/40',
+            )}
+            style={{ fontSize: '12px', fontWeight: 500 }}
+          >
+            <Eye className="size-3.5" />
+            Task info
+            <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewFull(task)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-primary hover:border-primary/40 transition-colors"
+            style={{ fontSize: '12px', fontWeight: 500 }}
+          >
+            <ExternalLink className="size-3.5" />
+            Full details
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-1 pb-3 border-t border-border/60">
+                <RequestDetailSections request={task} forms={forms} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <TaskWorkActions task={task} onStart={onStart} onFinish={onFinish} busy={busy} />
+      </div>
     </motion.div>
   );
 }
@@ -111,112 +110,159 @@ function ConfirmCompletionCard({
   task,
   onConfirm,
   onSendBack,
+  onViewFull,
   busy,
+  forms,
 }: {
   task: MyTask;
   onConfirm: (id: string, remarks?: string) => Promise<void>;
   onSendBack: (id: string, remarks: string) => Promise<void>;
+  onViewFull: (task: MyTask) => void;
   busy: string | null;
+  forms: import('../types').FormSchema[];
 }) {
   const [remarks, setRemarks] = useState('');
   const [mode, setMode] = useState<'idle' | 'sendback'>('idle');
   const [error, setError] = useState('');
+  const [expanded, setExpanded] = useState(false);
   const isBusy = busy === task.id;
 
   return (
-    <motion.div layout className="bg-card border border-purple-200/60 dark:border-purple-900/60 rounded-xl p-4 shadow-sm">
-      <div className="flex items-start justify-between gap-3 mb-2">
-        <div className="min-w-0">
-          <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>{task.formTitle}</p>
-          <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{task.requestNumber}</p>
+    <motion.div layout className="bg-card border border-purple-200/60 dark:border-purple-900/60 rounded-xl shadow-sm overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-start justify-between gap-3 mb-2">
+          <div className="min-w-0">
+            <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>{task.formTitle}</p>
+            <p className="text-muted-foreground" style={{ fontSize: '11px' }}>{task.requestNumber}</p>
+          </div>
+          <span className="px-2 py-0.5 rounded-md shrink-0 bg-purple-50 dark:bg-purple-950 text-purple-700" style={{ fontSize: '10px', fontWeight: 600 }}>
+            Confirm Completion
+          </span>
         </div>
-        <span className="px-2 py-0.5 rounded-md shrink-0 bg-purple-50 dark:bg-purple-950 text-purple-700" style={{ fontSize: '10px', fontWeight: 600 }}>
-          Confirm Completion
-        </span>
-      </div>
 
-      <p className="text-muted-foreground mb-2" style={{ fontSize: '12px' }}>
-        Requested by <strong className="text-foreground">{task.employee.name}</strong> · {task.employee.department}
-      </p>
-
-      {task.staffFinishRemarks && (
-        <p className="mb-3 p-2.5 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 text-foreground" style={{ fontSize: '12px' }}>
-          <strong>{task.staffFinishedBy}:</strong> {task.staffFinishRemarks}
+        <p className="text-muted-foreground mb-2" style={{ fontSize: '12px' }}>
+          Requested by <strong className="text-foreground">{task.employee.name}</strong> · {task.employee.department}
         </p>
-      )}
 
-      {task.assignedTo && (
-        <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
-          Completed by <strong className="text-foreground">{task.assignedTo}</strong>
-        </p>
-      )}
-
-      {mode === 'sendback' && (
-        <textarea
-          value={remarks}
-          onChange={(e) => { setRemarks(e.target.value); setError(''); }}
-          placeholder="Explain what needs to be reworked (required)..."
-          rows={3}
-          className="w-full mb-2 px-3 py-2 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm resize-none"
-        />
-      )}
-
-      {error && (
-        <p className="text-destructive flex items-center gap-1 mb-2" style={{ fontSize: '11px' }}>
-          <AlertCircle className="size-3" /> {error}
-        </p>
-      )}
-
-      <div className="flex gap-2">
-        {mode === 'idle' ? (
-          <>
-            <RippleButton
-              variant="success"
-              className="flex-1 justify-center"
-              icon={<CheckCircle className="size-4" />}
-              disabled={isBusy}
-              onClick={() => void onConfirm(task.id, remarks || undefined)}
-            >
-              {isBusy ? 'Confirming...' : 'Confirm Completion'}
-            </RippleButton>
-            <RippleButton
-              variant="ghost"
-              className="flex-1 justify-center border border-orange-300 text-orange-700 dark:text-orange-400"
-              icon={<RotateCcw className="size-4" />}
-              disabled={isBusy}
-              onClick={() => setMode('sendback')}
-            >
-              Send Back
-            </RippleButton>
-          </>
-        ) : (
-          <>
-            <RippleButton variant="ghost" className="flex-1" onClick={() => { setMode('idle'); setRemarks(''); setError(''); }}>Cancel</RippleButton>
-            <RippleButton
-              variant="primary"
-              className="flex-1 justify-center"
-              disabled={isBusy}
-              onClick={async () => {
-                if (!remarks.trim()) {
-                  setError('Remarks are required when sending back for rework');
-                  return;
-                }
-                await onSendBack(task.id, remarks.trim());
-                setMode('idle');
-                setRemarks('');
-              }}
-            >
-              {isBusy ? 'Sending...' : 'Send Back for Rework'}
-            </RippleButton>
-          </>
+        {task.staffFinishRemarks && (
+          <p className="mb-3 p-2.5 rounded-lg bg-purple-50/80 dark:bg-purple-950/40 text-foreground" style={{ fontSize: '12px' }}>
+            <strong>{task.staffFinishedBy}:</strong> {task.staffFinishRemarks}
+          </p>
         )}
+
+        <div className="flex flex-wrap gap-2 mb-3">
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className={cn(
+              'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border transition-colors',
+              expanded ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:text-foreground',
+            )}
+            style={{ fontSize: '12px', fontWeight: 500 }}
+          >
+            <Eye className="size-3.5" />
+            Task info
+            <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
+          </button>
+          <button
+            type="button"
+            onClick={() => onViewFull(task)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border text-muted-foreground hover:text-primary transition-colors"
+            style={{ fontSize: '12px', fontWeight: 500 }}
+          >
+            <ExternalLink className="size-3.5" />
+            Full details
+          </button>
+        </div>
+
+        <AnimatePresence initial={false}>
+          {expanded && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="overflow-hidden"
+            >
+              <div className="pt-1 pb-3 border-t border-border/60">
+                <RequestDetailSections request={task} forms={forms} />
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {task.assignedTo && (
+          <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
+            Completed by <strong className="text-foreground">{task.assignedTo}</strong>
+          </p>
+        )}
+
+        {mode === 'sendback' && (
+          <textarea
+            value={remarks}
+            onChange={(e) => { setRemarks(e.target.value); setError(''); }}
+            placeholder="Explain what needs to be reworked (required)..."
+            rows={3}
+            className="w-full mb-2 px-3 py-2 rounded-lg border border-border bg-input-background text-foreground outline-none focus:ring-2 focus:ring-primary/30 text-sm resize-none"
+          />
+        )}
+
+        {error && (
+          <p className="text-destructive flex items-center gap-1 mb-2" style={{ fontSize: '11px' }}>
+            <AlertCircle className="size-3" /> {error}
+          </p>
+        )}
+
+        <div className="flex gap-2">
+          {mode === 'idle' ? (
+            <>
+              <RippleButton
+                variant="success"
+                className="flex-1 justify-center"
+                icon={<CheckCircle className="size-4" />}
+                disabled={isBusy}
+                onClick={() => void onConfirm(task.id, remarks || undefined)}
+              >
+                {isBusy ? 'Confirming...' : 'Confirm Completion'}
+              </RippleButton>
+              <RippleButton
+                variant="ghost"
+                className="flex-1 justify-center border border-orange-300 text-orange-700 dark:text-orange-400"
+                icon={<RotateCcw className="size-4" />}
+                disabled={isBusy}
+                onClick={() => setMode('sendback')}
+              >
+                Send Back
+              </RippleButton>
+            </>
+          ) : (
+            <>
+              <RippleButton variant="ghost" className="flex-1" onClick={() => { setMode('idle'); setRemarks(''); setError(''); }}>Cancel</RippleButton>
+              <RippleButton
+                variant="primary"
+                className="flex-1 justify-center"
+                disabled={isBusy}
+                onClick={async () => {
+                  if (!remarks.trim()) {
+                    setError('Remarks are required when sending back for rework');
+                    return;
+                  }
+                  await onSendBack(task.id, remarks.trim());
+                  setMode('idle');
+                  setRemarks('');
+                }}
+              >
+                {isBusy ? 'Sending...' : 'Send Back for Rework'}
+              </RippleButton>
+            </>
+          )}
+        </div>
       </div>
     </motion.div>
   );
 }
 
 export function MyTasksPage() {
-  const { currentUser, refreshRequests } = useApp();
+  const { currentUser, refreshRequests, navigate, setSelectedRequest, forms } = useApp();
   const [tasks, setTasks] = useState<MyTask[]>([]);
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
@@ -236,6 +282,11 @@ export function MyTasksPage() {
 
   useEffect(() => { void loadTasks(); }, [loadTasks]);
   useScreenRefresh(loadTasks);
+
+  const handleViewFull = (task: MyTask) => {
+    setSelectedRequest(task);
+    navigate('request-detail', { returnTo: 'my-tasks', taskMode: true });
+  };
 
   const handleStart = async (id: string) => {
     setBusy(id);
@@ -306,7 +357,7 @@ export function MyTasksPage() {
           My Tasks
         </h1>
         <p className="text-muted-foreground mt-1" style={{ fontSize: '13px' }}>
-          Your assigned work and items waiting for your confirmation.
+          Open <strong>Task info</strong> to read the full request before you start work.
         </p>
       </div>
 
@@ -355,7 +406,9 @@ export function MyTasksPage() {
                     task={task}
                     onConfirm={handleConfirm}
                     onSendBack={handleSendBack}
+                    onViewFull={handleViewFull}
                     busy={busy}
+                    forms={forms}
                   />
                 ))}
               </div>
@@ -368,7 +421,15 @@ export function MyTasksPage() {
               )}
               <div className="space-y-3">
                 {workTasks.map((task) => (
-                  <WorkTaskCard key={task.id} task={task} onStart={handleStart} onFinish={handleFinish} busy={busy} />
+                  <WorkTaskCard
+                    key={task.id}
+                    task={task}
+                    onStart={handleStart}
+                    onFinish={handleFinish}
+                    onViewFull={handleViewFull}
+                    busy={busy}
+                    forms={forms}
+                  />
                 ))}
               </div>
             </section>

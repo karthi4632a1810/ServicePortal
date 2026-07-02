@@ -29,11 +29,14 @@ const BREADCRUMB_PARENTS: Record<string, string[]> = {
 };
 
 export function AppHeader() {
-  const { currentPage, navigate, isDark, toggleDark, searchQuery, setSearchQuery, currentUser, refreshScreen, screenRefreshing } = useApp();
+  const { currentPage, navigate, isDark, toggleDark, searchQuery, setSearchQuery, currentUser, refreshScreen, screenRefreshing, pageParams } = useApp();
   const [showSearch, setShowSearch] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
 
-  const parents = BREADCRUMB_PARENTS[currentPage] ?? [];
+  const returnTo = pageParams.returnTo as string | undefined;
+  const parents = currentPage === 'request-detail' && returnTo
+    ? [returnTo]
+    : (BREADCRUMB_PARENTS[currentPage] ?? []);
   const pageTitle = PAGE_LABELS[currentPage] ?? currentPage;
 
   return (
