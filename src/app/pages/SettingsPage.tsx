@@ -10,6 +10,7 @@ import { cn } from '../components/ui/utils';
 import { useApp, DEMO_LOGIN_USERS } from '../context/AppContext';
 import { isFixedSuperAdmin, getRoleLabel } from '../utils/roleAccess';
 import { ACCENT_COLORS } from '../utils/userPreferences';
+import { PaperZeroLogo } from '../components/branding/PaperZeroLogo';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '../utils/notificationPreferences';
 import type { NotificationPreferences } from '../utils/notificationPreferences';
 import { PasswordInput } from '../components/ui/password-input';
@@ -517,8 +518,11 @@ export function SettingsPage() {
                   </div>
 
                   <div>
-                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
-                    <div className="flex gap-3">
+                    <p className="text-muted-foreground mb-1" style={{ fontSize: '11px', fontWeight: 600 }}>ACCENT COLOR</p>
+                    <p className="text-muted-foreground mb-3" style={{ fontSize: '11px' }}>
+                      Buttons, links, and logo background
+                    </p>
+                    <div className="flex gap-3 items-center flex-wrap">
                       {ACCENT_COLORS.map(({ color, label }) => (
                         <button
                           key={color}
@@ -531,6 +535,10 @@ export function SettingsPage() {
                           style={{ background: color }}
                         />
                       ))}
+                      <div className="ml-2 pl-3 border-l border-border flex items-center gap-2">
+                        <PaperZeroLogo size={36} rounded="lg" />
+                        <span className="text-muted-foreground" style={{ fontSize: '11px' }}>Logo preview</span>
+                      </div>
                     </div>
                   </div>
 
