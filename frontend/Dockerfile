@@ -10,6 +10,7 @@ RUN pnpm install --frozen-lockfile
 COPY index.html vite.config.ts ./
 COPY public ./public
 COPY src ./src
+COPY scripts/copy-pdf-worker.mjs ./scripts/copy-pdf-worker.mjs
 
 ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL

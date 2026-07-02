@@ -9,9 +9,9 @@
     "pnpm": ">=9"
   },
   "scripts": {
-    "postinstall": "node scripts/copy-pdf-worker.mjs",
+    "copy-pdf-worker": "node scripts/copy-pdf-worker.mjs",
     "build": "node scripts/copy-pdf-worker.mjs && vite build",
-    "dev": "node scripts/kill-port.mjs 5173 && vite",
+    "dev": "node scripts/copy-pdf-worker.mjs && node scripts/kill-port.mjs 5173 && vite",
     "dev:backend": "node scripts/kill-port.mjs 5000 && pnpm --filter service-portal-backend dev",
     "start:backend": "node scripts/kill-port.mjs 5000 && pnpm --filter service-portal-backend start",
     "seed": "pnpm --filter service-portal-backend seed",
