@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
   X, ZoomIn, ZoomOut, Maximize2, Download, FileText, FileSpreadsheet,
@@ -7,10 +8,12 @@ import {
 import { cn } from '../ui/utils';
 import type { Attachment } from '../../types';
 import {
+  fetchAttachmentBlobUrl,
   getAttachmentKind,
   loadSpreadsheetRows,
   parseCsvText,
   resolveAttachmentUrl,
+  revokeBlobUrl,
   type AttachmentKind,
 } from '../../utils/attachmentUtils';
 
@@ -24,8 +27,15 @@ const KIND_META: Record<AttachmentKind, { label: string; icon: React.ElementType
 };
 
 const MIN_ZOOM = 0.35;
-const MAX_ZOOM = 3;
+const MAX_ZOOM = 4;
 const ZOOM_STEP = 0.15;
+
+function mimeForKind(kind: AttachmentKind, attachment?: Attachment | null): string | undefined {
+  if (attachment?.type) return attachment.type;
+  if (kind === 'pdf') return 'application/pdf';
+  if (kind === 'video') return 'video/mp4';
+  return undefined;
+}
 
 function ZoomableSurface({
   zoom,
@@ -37,12 +47,14 @@ function ZoomableSurface({
   className?: string;
 }) {
   return (
-    <div className={cn('overflow-auto flex-1 min-h-0 bg-muted/20', className)}>
-      <div
-        className="min-w-full min-h-full flex items-start justify-center p-6"
-        style={{ transform: `scale(${zoom})`, transformOrigin: 'top center' }}
-      >
-        {children}
+    <div className={cn('flex-1 min-h-0 overflow-auto overscroll-contain', className)}>
+      <div className="min-h-full flex items-center justify-center p-4 sm:p-8">
+        <div
+          style={{ transform: `scale(${zoom})`, transformOrigin: 'center center' }}
+          className="transition-transform duration-150"
+        >
+          {children}
+        </div>
       </div>
     </div>
   );
@@ -62,7 +74,7 @@ function SpreadsheetTable({ rows }: { rows: string[][] }) {
 
   return (
     <div className="rounded-xl border border-border/60 bg-card shadow-sm overflow-hidden">
-      <div className="overflow-auto max-w-[min(1100px,90vw)]">
+      <div className="overflow-auto">
         <table className="w-full border-collapse text-left" style={{ fontSize: '12px' }}>
           {hasHeader && (
             <thead>
@@ -109,6 +121,7 @@ export function AttachmentPreviewModal({
   const [zoom, setZoom] = useState(1);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [blobUrl, setBlobUrl] = useState<string | null>(null);
   const [csvRows, setCsvRows] = useState<string[][]>([]);
   const [sheetLabel, setSheetLabel] = useState('');
   const [sheetRows, setSheetRows] = useState<string[][]>([]);
@@ -118,27 +131,51 @@ export function AttachmentPreviewModal({
   const zoomIn = useCallback(() => setZoom((z) => Math.min(MAX_ZOOM, +(z + ZOOM_STEP).toFixed(2))), []);
   const zoomOut = useCallback(() => setZoom((z) => Math.max(MIN_ZOOM, +(z - ZOOM_STEP).toFixed(2))), []);
 
+  // Lock body scroll while open
   useEffect(() => {
-    if (!open || !attachment || !url) return;
+    if (!open) return;
+    const prevBody = document.body.style.overflow;
+    const prevHtml = document.documentElement.style.overflow;
+    document.body.style.overflow = 'hidden';
+    document.documentElement.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = prevBody;
+      document.documentElement.style.overflow = prevHtml;
+    };
+  }, [open]);
+
+  // Load file content
+  useEffect(() => {
+    if (!open || !attachment || !url) {
+      setBlobUrl(null);
+      setError(null);
+      setCsvRows([]);
+      setSheetRows([]);
+      setSheetLabel('');
+      return;
+    }
+
     setZoom(1);
     setError(null);
     setCsvRows([]);
     setSheetRows([]);
     setSheetLabel('');
 
-    if (kind !== 'csv' && kind !== 'excel') return;
-
     let cancelled = false;
-    setLoading(true);
+    let createdBlobUrl: string | null = null;
 
-    (async () => {
+    const load = async () => {
+      setLoading(true);
       try {
-        if (kind === 'csv') {
+        if (kind === 'pdf' || kind === 'image' || kind === 'video') {
+          createdBlobUrl = await fetchAttachmentBlobUrl(url, mimeForKind(kind, attachment));
+          if (!cancelled) setBlobUrl(createdBlobUrl);
+        } else if (kind === 'csv') {
           const res = await fetch(url);
           if (!res.ok) throw new Error('Could not load CSV file');
           const text = await res.text();
           if (!cancelled) setCsvRows(parseCsvText(text));
-        } else {
+        } else if (kind === 'excel') {
           const { sheetName, rows } = await loadSpreadsheetRows(url);
           if (!cancelled) {
             setSheetLabel(sheetName);
@@ -152,9 +189,15 @@ export function AttachmentPreviewModal({
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
 
-    return () => { cancelled = true; };
+    void load();
+
+    return () => {
+      cancelled = true;
+      revokeBlobUrl(createdBlobUrl);
+      setBlobUrl(null);
+    };
   }, [open, attachment, url, kind]);
 
   useEffect(() => {
@@ -176,9 +219,11 @@ export function AttachmentPreviewModal({
   };
 
   const handleDownload = () => {
-    if (!url || !attachment) return;
+    if (!attachment) return;
+    const href = blobUrl || url;
+    if (!href) return;
     const a = document.createElement('a');
-    a.href = url;
+    a.href = href;
     a.download = attachment.name;
     a.rel = 'noopener';
     document.body.appendChild(a);
@@ -217,50 +262,50 @@ export function AttachmentPreviewModal({
 
     switch (kind) {
       case 'image':
-        return (
-          <ZoomableSurface zoom={zoom}>
+        return blobUrl ? (
+          <ZoomableSurface zoom={zoom} className="bg-neutral-950/95">
             <img
-              src={url}
+              src={blobUrl}
               alt={attachment.name}
-              className="max-w-none rounded-lg shadow-lg border border-border/40 bg-card"
+              className="max-w-[90vw] max-h-[85vh] object-contain rounded-lg shadow-2xl"
               draggable={false}
             />
           </ZoomableSurface>
-        );
+        ) : null;
       case 'pdf':
-        return (
-          <ZoomableSurface zoom={zoom}>
+        return blobUrl ? (
+          <ZoomableSurface zoom={zoom} className="bg-neutral-200 dark:bg-neutral-900">
             <iframe
               title={attachment.name}
-              src={`${url}#toolbar=0&navpanes=0`}
-              className="rounded-xl border border-border/60 bg-white shadow-lg"
-              style={{ width: '820px', height: '1100px' }}
+              src={blobUrl}
+              className="rounded-lg border border-border/60 bg-white shadow-xl"
+              style={{ width: '850px', height: '1100px', maxWidth: '90vw' }}
             />
           </ZoomableSurface>
-        );
+        ) : null;
       case 'video':
-        return (
-          <div className="flex-1 min-h-0 flex items-center justify-center p-6 bg-black/90">
+        return blobUrl ? (
+          <div className="flex-1 min-h-0 flex items-center justify-center bg-black">
             <video
-              src={url}
+              src={blobUrl}
               controls
-              className="max-w-full max-h-full rounded-xl shadow-2xl"
-              style={{ maxHeight: 'calc(92vh - 120px)' }}
+              className="max-w-full max-h-full"
+              style={{ maxHeight: 'calc(100vh - 72px)' }}
             >
               Your browser does not support video playback.
             </video>
           </div>
-        );
+        ) : null;
       case 'csv':
         return (
-          <ZoomableSurface zoom={zoom}>
+          <ZoomableSurface zoom={zoom} className="bg-muted/20">
             <SpreadsheetTable rows={csvRows} />
           </ZoomableSurface>
         );
       case 'excel':
         return (
-          <ZoomableSurface zoom={zoom}>
-            <div className="space-y-3 w-full max-w-[min(1100px,90vw)]">
+          <ZoomableSurface zoom={zoom} className="bg-muted/20">
+            <div className="space-y-3">
               {sheetLabel && (
                 <p className="text-muted-foreground px-1" style={{ fontSize: '11px', fontWeight: 600 }}>
                   Sheet: {sheetLabel}
@@ -296,107 +341,85 @@ export function AttachmentPreviewModal({
     }
   };
 
-  return (
+  if (typeof document === 'undefined') return null;
+
+  return createPortal(
     <AnimatePresence>
       {open && attachment && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-5"
+          transition={{ duration: 0.18 }}
+          className="fixed inset-0 z-[9999] flex flex-col bg-background"
+          role="dialog"
+          aria-modal="true"
+          aria-label={`Preview ${attachment.name}`}
         >
-          <motion.button
-            type="button"
-            aria-label="Close preview"
-            className="absolute inset-0 bg-background/80 backdrop-blur-md"
-            onClick={onClose}
-          />
-
-          <motion.div
-            initial={{ opacity: 0, y: 16, scale: 0.98 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 12, scale: 0.98 }}
-            transition={{ duration: 0.22, ease: [0.25, 0.46, 0.45, 0.94] }}
-            className="relative z-10 flex flex-col w-full max-w-[96vw] h-[92vh] rounded-2xl border border-border/60 bg-card shadow-2xl overflow-hidden"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Toolbar */}
-            <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-card/95 backdrop-blur-sm">
-              <div className={cn('size-9 rounded-xl flex items-center justify-center shrink-0', meta.tone)}>
-                <KindIcon className="size-4" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>
-                  {attachment.name}
-                </p>
-                <p className="text-muted-foreground" style={{ fontSize: '11px' }}>
-                  {meta.label}{attachment.size ? ` · ${attachment.size}` : ''}
-                </p>
-              </div>
-
-              {kind !== 'video' && kind !== 'unknown' && (
-                <>
-                  <div className="hidden sm:flex items-center gap-1 px-2 py-1 rounded-xl bg-muted/60 border border-border/50">
-                    <button type="button" onClick={zoomOut} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Zoom out">
-                      <ZoomOut className="size-4 text-muted-foreground" />
-                    </button>
-                    <span className="w-12 text-center text-foreground tabular-nums" style={{ fontSize: '11px', fontWeight: 600 }}>
-                      {Math.round(zoom * 100)}%
-                    </span>
-                    <button type="button" onClick={zoomIn} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Zoom in">
-                      <ZoomIn className="size-4 text-muted-foreground" />
-                    </button>
-                    <button type="button" onClick={resetZoom} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Reset zoom">
-                      <RotateCcw className="size-3.5 text-muted-foreground" />
-                    </button>
-                    <button type="button" onClick={() => setZoom(1)} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Fit view">
-                      <Maximize2 className="size-3.5 text-muted-foreground" />
-                    </button>
-                  </div>
-                  <div className="flex sm:hidden items-center gap-1">
-                    <button type="button" onClick={zoomOut} className="size-8 flex items-center justify-center rounded-lg border border-border" title="Zoom out">
-                      <ZoomOut className="size-3.5" />
-                    </button>
-                    <span className="text-foreground tabular-nums w-10 text-center" style={{ fontSize: '10px', fontWeight: 600 }}>
-                      {Math.round(zoom * 100)}%
-                    </span>
-                    <button type="button" onClick={zoomIn} className="size-8 flex items-center justify-center rounded-lg border border-border" title="Zoom in">
-                      <ZoomIn className="size-3.5" />
-                    </button>
-                  </div>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={handleDownload}
-                className="size-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Download"
-              >
-                <Download className="size-4" />
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="size-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
-                title="Close"
-              >
-                <X className="size-4" />
-              </button>
+          {/* Toolbar */}
+          <div className="shrink-0 flex items-center gap-3 px-4 py-3 border-b border-border/60 bg-card/95 backdrop-blur-sm">
+            <div className={cn('size-9 rounded-xl flex items-center justify-center shrink-0', meta.tone)}>
+              <KindIcon className="size-4" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-foreground truncate" style={{ fontSize: '14px', fontWeight: 600 }}>
+                {attachment.name}
+              </p>
+              <p className="text-muted-foreground" style={{ fontSize: '11px' }}>
+                {meta.label}{attachment.size ? ` · ${attachment.size}` : ''}
+              </p>
             </div>
 
-            {/* Preview area */}
-            <div
-              ref={surfaceRef}
-              className="flex-1 min-h-0 flex flex-col"
-              onWheel={handleWheel}
+            {kind !== 'video' && kind !== 'unknown' && (
+              <div className="flex items-center gap-1 px-2 py-1 rounded-xl bg-muted/60 border border-border/50">
+                <button type="button" onClick={zoomOut} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Zoom out">
+                  <ZoomOut className="size-4 text-muted-foreground" />
+                </button>
+                <span className="w-12 text-center text-foreground tabular-nums" style={{ fontSize: '11px', fontWeight: 600 }}>
+                  {Math.round(zoom * 100)}%
+                </span>
+                <button type="button" onClick={zoomIn} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Zoom in">
+                  <ZoomIn className="size-4 text-muted-foreground" />
+                </button>
+                <button type="button" onClick={resetZoom} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Reset zoom">
+                  <RotateCcw className="size-3.5 text-muted-foreground" />
+                </button>
+                <button type="button" onClick={() => setZoom(1)} className="size-8 flex items-center justify-center rounded-lg hover:bg-background transition-colors" title="Fit view">
+                  <Maximize2 className="size-3.5 text-muted-foreground" />
+                </button>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={handleDownload}
+              className="size-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Download"
             >
-              {renderContent()}
-            </div>
-          </motion.div>
+              <Download className="size-4" />
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="size-9 flex items-center justify-center rounded-xl border border-border text-muted-foreground hover:text-foreground hover:bg-muted transition-colors"
+              title="Close (Esc)"
+            >
+              <X className="size-4" />
+            </button>
+          </div>
+
+          {/* Preview — scroll only inside this area */}
+          <div
+            ref={surfaceRef}
+            className="flex-1 min-h-0 flex flex-col overflow-hidden touch-none"
+            onWheel={handleWheel}
+          >
+            {renderContent()}
+          </div>
         </motion.div>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body,
   );
 }
 

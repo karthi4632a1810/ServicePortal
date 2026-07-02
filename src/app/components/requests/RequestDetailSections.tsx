@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Paperclip } from 'lucide-react';
+import { User, Building2, Paperclip } from 'lucide-react';
 import type { Attachment, FormSchema, Request } from '../../types';
 import { AttachmentListItem, AttachmentPreviewModal } from '../attachments/AttachmentPreviewModal';
 

@@ -25,6 +25,19 @@ export function getAttachmentKind(att: Attachment): AttachmentKind {
   return 'unknown';
 }
 
+export async function fetchAttachmentBlobUrl(url: string, mimeType?: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Could not load file');
+  const buffer = await res.arrayBuffer();
+  const type = mimeType || res.headers.get('content-type') || 'application/octet-stream';
+  const blob = new Blob([buffer], { type: type.split(';')[0].trim() });
+  return URL.createObjectURL(blob);
+}
+
+export function revokeBlobUrl(blobUrl: string | null | undefined) {
+  if (blobUrl?.startsWith('blob:')) URL.revokeObjectURL(blobUrl);
+}
+
 export function formatAttachmentSize(size?: string): string {
   if (!size) return '';
   return size;
