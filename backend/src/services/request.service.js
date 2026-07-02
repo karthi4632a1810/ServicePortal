@@ -61,6 +61,7 @@ function mapRequestToFrontend(doc) {
     })),
     dueDate: r.dueDate?.toISOString?.() || r.dueDate,
     queueStatus: r.queueStatus,
+    completedAt: r.completedAt?.toISOString?.() || r.completedAt,
     mdApprove: r.mdApprove === true,
   };
 }
@@ -202,6 +203,35 @@ export class RequestService {
         }
         seen.add(id);
         results.push(withTaskType(doc, 'confirm_completion'));
+      }
+    }
+
+    if (assigneeOr.length) {
+      const completedWork = await Request.find({
+        status: 'completed',
+        $or: assigneeOr,
+      }).sort('-completedAt').limit(100);
+
+      for (const doc of completedWork) {
+        const id = doc._id.toString();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        results.push(withTaskType(doc, 'completed'));
+      }
+    }
+
+    if (isHod(user.role) || isSuperAdmin(user.role)) {
+      const completedConfirm = await Request.find({
+        status: 'completed',
+        staffFinishedAt: { $exists: true },
+      }).sort('-completedAt').limit(100);
+
+      for (const doc of completedConfirm) {
+        if (!isSuperAdmin(user.role) && !this.isReceiverDeptHod(user, doc)) continue;
+        const id = doc._id.toString();
+        if (seen.has(id)) continue;
+        seen.add(id);
+        results.push(withTaskType(doc, 'completed'));
       }
     }
 

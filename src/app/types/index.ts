@@ -147,9 +147,10 @@ export interface Request {
   assignees?: Array<{ employeeId: string; name: string; userId?: string; status: string }>;
   queueStatus?: 'pending' | 'in_progress' | 'pending_hod_review' | 'paused' | 'completed' | 'cancelled';
   dueDate?: string;
+  completedAt?: string;
 }
 
-export type MyTaskType = 'work' | 'confirm_completion';
+export type MyTaskType = 'work' | 'confirm_completion' | 'completed';
 
 export interface MyTask extends Request {
   taskType?: MyTaskType;
