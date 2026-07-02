@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Link, useNavigate } from 'react-router';
-import { ClipboardList, LogIn, ArrowLeft, Loader2 } from 'lucide-react';
+import { LogIn, ArrowLeft, Loader2 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../utils/branding';
+import { PaperZeroLogo } from '../components/branding/PaperZeroLogo';
 import { PasswordInput } from '../components/ui/password-input';
 import { UserAvatar } from '../components/ui/user-avatar';
 import { verifyStaffInHrms } from '../utils/fetchEmployeeTiered';
@@ -170,9 +171,7 @@ export function LoginPage() {
               </>
             ) : (
               <>
-                <div className="size-10 rounded-xl bg-primary flex items-center justify-center shrink-0">
-                  <ClipboardList className="size-5 text-primary-foreground" />
-                </div>
+                <PaperZeroLogo size={40} rounded="xl" />
                 <div>
                   <h1 className="text-foreground" style={{ fontSize: '20px', fontWeight: 700 }}>{APP_NAME}</h1>
                   <p className="text-muted-foreground" style={{ fontSize: '12px' }}>{APP_TAGLINE}</p>

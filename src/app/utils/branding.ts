@@ -1,6 +1,9 @@
 export const APP_NAME = 'PaperZero';
 export const APP_TAGLINE = 'Digital forms, zero paper';
 
+export const FAVICON_URL = '/paperZeroLogo.png';
+export const LOGO_OUTLINE_URL = '/PaperZeroOutlineIcon.png';
+
 export const FORM_CATEGORIES = {
   IT: 'IT Forms',
   ALL: 'Forms',

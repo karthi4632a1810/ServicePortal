@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router';
-import { ClipboardList, Key, LayoutDashboard, LogOut, Route } from 'lucide-react';
+import { Key, LayoutDashboard, LogOut, Route } from 'lucide-react';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
+import { PaperZeroLogo } from '../branding/PaperZeroLogo';
 import { useApp } from '../../context/AppContext';
 import { getDefaultPage, isFixedSuperAdmin } from '../../utils/roleAccess';
 import { ChangePasswordModal } from '../auth/ChangePasswordModal';
@@ -38,9 +39,7 @@ export function PublicLayout({ children }: { children: React.ReactNode }) {
       <header className="min-h-14 bg-card border-b border-border sticky top-0 z-30 safe-top">
         <div className="max-w-[1200px] mx-auto w-full min-h-14 flex items-center px-3 sm:px-6 gap-2 sm:gap-4 py-2">
           <Link to="/" className="flex items-center gap-2 sm:gap-3 min-w-0 hover:opacity-90 transition-opacity shrink">
-            <div className="size-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <ClipboardList className="size-4 text-primary-foreground" />
-            </div>
+            <PaperZeroLogo size={32} rounded="lg" />
             <div className="min-w-0">
               <span className="text-foreground font-semibold block truncate" style={{ fontSize: '14px', lineHeight: 1.2 }}>
                 {APP_NAME}

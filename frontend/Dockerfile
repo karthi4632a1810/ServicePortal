@@ -8,6 +8,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN pnpm install --frozen-lockfile
 
 COPY index.html vite.config.ts ./
+COPY public ./public
 COPY src ./src
 
 ARG VITE_API_URL=/api

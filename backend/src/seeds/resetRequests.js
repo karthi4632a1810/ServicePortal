@@ -99,7 +99,7 @@ function printUsage() {
   console.error('  docker compose exec backend node backend/src/seeds/resetRequests.js --confirm');
 }
 
-const isDirectRun = process.argv[1]?.replace(/\\/g, '/').includes('resetRequests');
+const isDirectRun = process.argv[1]?.replace(/\\/g, '/').includes('src/seeds/resetRequests.js');
 
 if (isDirectRun) {
   const opts = parseArgs();

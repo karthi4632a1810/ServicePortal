@@ -184,6 +184,9 @@ $COMPOSE down
 # Re-seed forms
 $COMPOSE exec backend node backend/scripts/seedMongoDb.js --skip-users
 
+# Reset all requests (requires --confirm; add --uploads to clear files too)
+$COMPOSE exec backend node backend/scripts/resetRequests.js --confirm
+
 # Full re-seed
 $COMPOSE --profile seed run --rm seed
 ```

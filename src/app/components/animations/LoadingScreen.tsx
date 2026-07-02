@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ClipboardList } from 'lucide-react';
 import { FloatingOrbs } from './FloatingOrbs';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
-
+import { PaperZeroLogo } from '../branding/PaperZeroLogo';
 interface LoadingScreenProps {
   onComplete?: () => void;
   duration?: number;
@@ -83,12 +82,12 @@ export function LoadingScreen({ onComplete, duration = 2800, skipAnimation = fal
               animate={{ scale: [1, 1.3, 1], opacity: [0.3, 0, 0.3] }}
               transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
             />
-            <div className="relative size-20 rounded-2xl bg-primary flex items-center justify-center shadow-2xl shadow-primary/30">
+            <div className="relative shadow-2xl shadow-primary/20">
               <motion.div
                 animate={{ rotate: [0, 5, -5, 0] }}
                 transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
               >
-                <ClipboardList className="size-10 text-primary-foreground" />
+                <PaperZeroLogo size={80} rounded="xl" />
               </motion.div>
             </div>
           </motion.div>

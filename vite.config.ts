@@ -24,7 +24,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.ico'],
+      includeAssets: ['paperZeroLogo.png', 'PaperZeroOutlineIcon.png'],
       manifest: {
         name: 'PaperZero',
         short_name: 'PaperZero',
@@ -33,6 +33,14 @@ export default defineConfig({
         background_color: '#ffffff',
         display: 'standalone',
         start_url: '/',
+        icons: [
+          {
+            src: 'paperZeroLogo.png',
+            sizes: '512x512',
+            type: 'image/png',
+            purpose: 'any maskable',
+          },
+        ],
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],

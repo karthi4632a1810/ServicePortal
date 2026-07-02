@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { cn } from '../ui/utils';
 import { UserAvatar } from '../ui/user-avatar';
+import { PaperZeroLogo } from '../branding/PaperZeroLogo';
 import { useApp } from '../../context/AppContext';
 import { APP_NAME, APP_TAGLINE } from '../../utils/branding';
 import { canAccessPage } from '../../utils/roleAccess';
@@ -111,9 +112,7 @@ export function AppSidebar() {
     >
       <div className="flex items-center h-14 px-4 border-b border-sidebar-border shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="size-8 rounded-lg bg-sidebar-primary flex items-center justify-center shrink-0">
-            <ClipboardList className="size-4 text-sidebar-primary-foreground" />
-          </div>
+          <PaperZeroLogo size={32} rounded="lg" />
           <AnimatePresence>
             {!isSidebarCollapsed && (
               <motion.div
